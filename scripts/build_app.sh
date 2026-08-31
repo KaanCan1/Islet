@@ -24,7 +24,9 @@ printf 'APPL????' > "$APP/Contents/PkgInfo"
 # from the code hash, so every build looks like a different program and every
 # permission is asked again. Falls back to ad-hoc when no identity is set up.
 IDENTITY="${ISLET_SIGN_IDENTITY:-Islet Dev}"
-if security find-identity -v -p codesigning 2>/dev/null | grep -q "$IDENTITY"; then
+# Not -v: a self-signed identity reports as untrusted, but codesign will
+# still sign with it, and that is all this needs.
+if security find-identity -p codesigning 2>/dev/null | grep -q "$IDENTITY"; then
 	echo "==> Signing as $IDENTITY"
 	codesign --force --sign "$IDENTITY" "$APP"
 else
