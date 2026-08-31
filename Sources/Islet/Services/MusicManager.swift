@@ -1,6 +1,5 @@
 import AppKit
 import Combine
-import SwiftUI
 
 enum PlayerApp: String, Equatable {
     case none, spotify, music
@@ -46,8 +45,6 @@ final class MusicManager: ObservableObject {
     @Published private(set) var track = TrackInfo()
     @Published private(set) var position: Double = 0
     @Published private(set) var artwork: NSImage?
-    /// Accent colour pulled from the artwork; used by the progress ring.
-    @Published private(set) var accent: Color = .white
     @Published private(set) var anyPlayerRunning = false
 
     /// Poll more often while the panel is open, less often while it is closed.
@@ -200,7 +197,6 @@ final class MusicManager: ObservableObject {
         // The track may have changed while the artwork was loading.
         guard info.artworkKey == lastArtworkKey else { return }
         artwork = image
-        accent = image.flatMap(Color.dominant(of:)) ?? .white
     }
 
     // MARK: - Commands

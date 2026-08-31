@@ -11,8 +11,6 @@ final class Preferences: ObservableObject {
     @Published var showPeek: Bool { didSet { store.set(showPeek, forKey: "showPeek") } }
     /// Play a sound when the timer finishes.
     @Published var chimeEnabled: Bool { didSet { store.set(chimeEnabled, forKey: "chimeEnabled") } }
-    /// Trace track progress around the notch outline while collapsed.
-    @Published var showProgressRing: Bool { didSet { store.set(showProgressRing, forKey: "showProgressRing") } }
     /// Keep the panel visible on the lock screen (raises the window level).
     @Published var showOnLockScreen: Bool { didSet { store.set(showOnLockScreen, forKey: "showOnLockScreen") } }
     /// Open the panel when the charger is connected or the battery runs low.
@@ -23,7 +21,6 @@ final class Preferences: ObservableObject {
     private init() {
         store.register(defaults: [
             "showPeek": true,
-            "showProgressRing": true,
             "showOnLockScreen": true,
             "showBatteryAlerts": true,
             "chimeEnabled": true,
@@ -31,7 +28,6 @@ final class Preferences: ObservableObject {
             "breakMinutes": 5
         ])
         showPeek = store.bool(forKey: "showPeek")
-        showProgressRing = store.bool(forKey: "showProgressRing")
         showOnLockScreen = store.bool(forKey: "showOnLockScreen")
         showBatteryAlerts = store.bool(forKey: "showBatteryAlerts")
         chimeEnabled = store.bool(forKey: "chimeEnabled")

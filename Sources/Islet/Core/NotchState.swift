@@ -107,16 +107,6 @@ final class NotchState: ObservableObject {
         }
     }
 
-    /// Trace the playing track's progress around the notch while collapsed.
-    var showsProgressRing: Bool {
-        prefs.showProgressRing && !isExpanded && music.track.isPlaying && music.track.duration > 0
-    }
-
-    var musicProgress: Double {
-        guard music.track.duration > 0 else { return 0 }
-        return min(max(music.position / music.track.duration, 0), 1)
-    }
-
     /// Fully transparent while collapsed and idle: nothing but the notch shows.
     var chromeOpacity: Double { presentation != .collapsed || showsPeek ? 1 : 0 }
 

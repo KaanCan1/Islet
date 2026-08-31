@@ -17,10 +17,11 @@ final class NotchController {
         startMonitors()
 
         // Documentation hook: ISLET_DEMO=music|timer holds the panel open on one
-        // tab so screenshots for the README are reproducible.
+        // tab so screenshots for the README are reproducible. Deliberately time
+        // limited — a panel stuck open forever is worse than a missed capture.
         if let demo = ProcessInfo.processInfo.environment["ISLET_DEMO"] {
             state.tab = demo.lowercased() == "timer" ? .timer : .music
-            state.forceExpandUntil = .distantFuture
+            state.forceExpandUntil = Date().addingTimeInterval(120)
         }
 
         NotificationCenter.default.addObserver(

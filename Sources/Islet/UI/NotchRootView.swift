@@ -41,7 +41,6 @@ struct NotchRootView: View {
                         .stroke(Color.white.opacity(state.isExpanded ? 0.10 : 0), lineWidth: 0.8)
                 )
                 .shadow(color: .black.opacity(state.isExpanded ? 0.5 : 0), radius: 16, y: 8)
-                .overlay(progressRing)
 
             content
                 .padding(.horizontal, Layout.shoulder)
@@ -49,21 +48,6 @@ struct NotchRootView: View {
         }
         .frame(width: state.frameSize.width, height: state.frameSize.height)
         .opacity(state.chromeOpacity)
-    }
-
-    /// Track progress traced around the notch outline while collapsed.
-    @ViewBuilder
-    private var progressRing: some View {
-        if state.showsProgressRing {
-            NotchShape(topRadius: Layout.shoulder, bottomRadius: 9)
-                .trim(from: 0, to: state.musicProgress)
-                .stroke(
-                    music.accent.opacity(0.9),
-                    style: StrokeStyle(lineWidth: 2, lineCap: .round)
-                )
-                .animation(.linear(duration: 0.9), value: state.musicProgress)
-                .transition(.opacity)
-        }
     }
 
     @ViewBuilder
