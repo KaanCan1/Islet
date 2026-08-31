@@ -18,7 +18,7 @@ enum Layout {
     /// content area below the physical notch; the total is worked out in NotchState.
     static let musicHeight: CGFloat = 100
     static let timerHeight: CGFloat = 108
-    static let claudeHeight: CGFloat = 128
+    static let claudeHeight: CGFloat = 138
 
     /// Height of a transient alert (battery) below the notch strip.
     static let activityHeight: CGFloat = 26

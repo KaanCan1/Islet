@@ -72,7 +72,7 @@ struct ClaudePanel: View {
 private struct WindowRow: View {
     var title: String
     var window: ClaudeWindow
-    /// The five-hour block has a clock worth drawing; the rolling week doesn't.
+    /// Only the five-hour row prints its reset time; the week's is further off.
     var showsClock: Bool
 
     private var accent: Color {
@@ -96,17 +96,15 @@ private struct WindowRow: View {
                     .monospacedDigit()
             }
 
-            if showsClock {
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color.white.opacity(0.12))
-                        Capsule()
-                            .fill(accent.opacity(0.75))
-                            .frame(width: max(3, geo.size.width * (window.percent ?? window.elapsedFraction)))
-                    }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.white.opacity(0.12))
+                    Capsule()
+                        .fill(accent.opacity(0.75))
+                        .frame(width: max(3, geo.size.width * (window.percent ?? window.elapsedFraction)))
                 }
-                .frame(height: 4)
             }
+            .frame(height: 4)
 
             Text(detail)
                 .font(.system(size: 9.5))
