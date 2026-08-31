@@ -11,6 +11,8 @@ final class Preferences: ObservableObject {
     @Published var showPeek: Bool { didSet { store.set(showPeek, forKey: "showPeek") } }
     /// Play a sound when the timer finishes.
     @Published var chimeEnabled: Bool { didSet { store.set(chimeEnabled, forKey: "chimeEnabled") } }
+    /// Whether the one-time Claude consent prompt has been shown.
+    @Published var claudeConsentAsked: Bool { didSet { store.set(claudeConsentAsked, forKey: "claudeConsentAsked") } }
     /// Show the Claude Code usage column in the music panel.
     @Published var showClaudeUsage: Bool { didSet { store.set(showClaudeUsage, forKey: "showClaudeUsage") } }
     /// Keep the panel visible on the lock screen (raises the window level).
@@ -23,7 +25,8 @@ final class Preferences: ObservableObject {
     private init() {
         store.register(defaults: [
             "showPeek": true,
-            "showClaudeUsage": true,
+            "showClaudeUsage": false,
+            "claudeConsentAsked": false,
             "showOnLockScreen": true,
             "showBatteryAlerts": true,
             "chimeEnabled": true,
@@ -32,6 +35,7 @@ final class Preferences: ObservableObject {
         ])
         showPeek = store.bool(forKey: "showPeek")
         showClaudeUsage = store.bool(forKey: "showClaudeUsage")
+        claudeConsentAsked = store.bool(forKey: "claudeConsentAsked")
         showOnLockScreen = store.bool(forKey: "showOnLockScreen")
         showBatteryAlerts = store.bool(forKey: "showBatteryAlerts")
         chimeEnabled = store.bool(forKey: "chimeEnabled")

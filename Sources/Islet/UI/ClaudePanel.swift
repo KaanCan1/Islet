@@ -30,6 +30,12 @@ struct ClaudePanel: View {
                     .font(.system(size: 9))
                     .foregroundStyle(.white.opacity(0.3))
                     .monospacedDigit()
+                if let snapshot = claude.snapshot {
+                    IconButton(symbol: "target", size: 9) {
+                        ClaudeCalibration.run(snapshot: snapshot) { claude.refresh() }
+                    }
+                    .help("Calibrate against the percentages Claude Code reports")
+                }
                 IconButton(symbol: "arrow.clockwise", size: 9) { claude.refresh() }
                     .disabled(claude.isScanning)
                     .rotationEffect(.degrees(claude.isScanning ? 360 : 0))
@@ -44,6 +50,12 @@ struct ClaudePanel: View {
             if let snapshot = claude.snapshot {
                 WindowRow(title: "This 5-hour block", window: snapshot.fiveHour, showsClock: true)
                 WindowRow(title: "Last 7 days", window: snapshot.sevenDay, showsClock: false)
+
+                Text(snapshot.fiveHour.budgetIsEstimated
+                     ? "~ estimated from past rate limits — tap the target to calibrate"
+                     : "calibrated against Claude Code")
+                    .font(.system(size: 8.5))
+                    .foregroundStyle(.white.opacity(0.28))
             } else {
                 Text("No Claude Code sessions in the last 30 days.")
                     .font(.system(size: 11))
@@ -64,7 +76,11 @@ private struct WindowRow: View {
     var showsClock: Bool
 
     private var accent: Color {
-        window.limitReached ? .red : Color(red: 0.87, green: 0.64, blue: 0.46)
+        if window.limitReached { return .red }
+        guard let percent = window.percent else { return Color(red: 0.87, green: 0.64, blue: 0.46) }
+        if percent > 0.85 { return Color(red: 1, green: 0.55, blue: 0.4) }
+        if percent > 0.6 { return Color(red: 1, green: 0.78, blue: 0.42) }
+        return Color(red: 0.87, green: 0.64, blue: 0.46)
     }
 
     var body: some View {
@@ -74,13 +90,9 @@ private struct WindowRow: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.white.opacity(0.75))
                 Spacer()
-                Text(window.tokensText)
-                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                Text(window.percentText ?? window.tokensText)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(accent)
-                    .monospacedDigit()
-                Text(window.costText)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.white.opacity(0.35))
                     .monospacedDigit()
             }
 
@@ -107,11 +119,10 @@ private struct WindowRow: View {
         if window.limitReached {
             return "rate limited · resets in " + window.remainingText
         }
-        if let percent = window.percentText {
-            return "\(percent) of your budget · resets in " + window.remainingText
-        }
-        return showsClock
-            ? "block resets in " + window.remainingText
-            : "tokens sent, cache reads excluded"
+        var text = window.tokensText
+        if let budget = window.budgetText { text += " of \(budget)" }
+        text += " tokens"
+        if showsClock { text += " · resets in " + window.remainingText }
+        return text
     }
 }

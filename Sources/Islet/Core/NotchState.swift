@@ -59,9 +59,20 @@ final class NotchState: ObservableObject {
             .store(in: &bag)
     }
 
-    /// The Claude tab only exists when the usage column is switched on.
+    /// The Claude tab exists only when the feature is on and there is something
+    /// to show. With no Claude Code sessions on the machine it disappears
+    /// entirely, leaving music and timer.
+    var showsClaude: Bool {
+        prefs.showClaudeUsage && (claude.snapshot != nil || claude.isScanning)
+    }
+
     var visibleTabs: [Tab] {
-        prefs.showClaudeUsage ? Tab.allCases : Tab.allCases.filter { $0 != .claude }
+        showsClaude ? Tab.allCases : Tab.allCases.filter { $0 != .claude }
+    }
+
+    /// Falls back to music if the selected tab has just disappeared.
+    var effectiveTab: Tab {
+        visibleTabs.contains(tab) ? tab : .music
     }
 
     // MARK: - Transient alerts
@@ -112,7 +123,7 @@ final class NotchState: ObservableObject {
         // The top strip stays empty: the physical notch sits there, so anything
         // drawn in that band is simply not visible.
         CGSize(width: max(Layout.contentWidth, notchSize.width) + Layout.shoulder * 2,
-               height: notchSize.height + tab.height)
+               height: notchSize.height + effectiveTab.height)
     }
 
     var activitySize: CGSize {

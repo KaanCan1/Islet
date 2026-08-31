@@ -47,23 +47,23 @@ readings need no permission.
   `MediaRemote` to unentitled apps.
 - The Claude figures come from `~/.claude/projects/*.jsonl`, read locally — only
   timestamps, token counts and model names, never message content, and nothing
-  leaves the machine. Hourly totals are cached in Application Support, so only the
-  first scan is slow (about 12 seconds for 380 MB of transcripts, on a background
-  thread); after that it refreshes every minute, and the panel has a refresh
-  button. Turn the whole thing off from the menu bar item.
-- **There is deliberately no "percent of your limit."** Nothing on disk states the
-  account's ceiling, and it cannot be inferred from the rate limits that *were*
-  recorded: across the rejections on the machine this was built on, the block
-  totals ranged from 1.2M to 4.3M tokens — $133 to $435 of equivalent API spend —
-  so no single number explains them. What is shown is what can actually be
-  measured: tokens sent (cache reads excluded, they dwarf everything else), the
-  equivalent API cost at published per-model rates, and the block's own clock. If
-  you want a percentage, supply your own budget and one appears:
-
-```bash
-defaults write dev.kaancankurt.islet claudeBlockBudget -int 2000000
-defaults write dev.kaancankurt.islet claudeWeekBudget -int 30000000
-```
+  leaves the machine. Islet asks before it reads any of it, and the whole thing
+  stays hidden if you have never used Claude Code.
+- **The percentage needs calibrating once.** Claude Code fetches its limits from
+  the API and writes them nowhere, and they move (the account this was built on
+  had a "+50% weekly limits" promo running). Guessing the ceiling from past rate
+  limits was not good enough — the block totals at the moments this account was
+  rate limited ranged from 1.2M to 4.3M tokens. So run `/usage` in Claude Code,
+  press the target button in the panel, and type the two percentages it reports;
+  Islet back-solves the ceilings from what you have already spent and uses them
+  from then on. Until you do, it shows an estimate marked with `~`.
+- Token totals exclude cache reads, which otherwise dwarf everything else. The
+  five-hour window is timed from the first request after the previous window ran
+  out, not rounded to the hour — rounding put the reset time up to an hour out.
+- Hourly scanning is incremental: only bytes appended since the last pass are
+  read, so just the first scan is slow (about 12 seconds for 380 MB of
+  transcripts, on a background thread). It refreshes every minute and the panel
+  has a refresh button.
 - Displays without a notch get a virtual one at the top centre of the screen.
 - In full-screen apps macOS slides the menu bar down the moment the cursor
   touches the top edge. That's the system, not Islet. To stop it: System Settings

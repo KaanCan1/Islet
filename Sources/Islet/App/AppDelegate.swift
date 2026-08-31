@@ -8,6 +8,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         controller.start()
         setupStatusItem()
+        askAboutClaudeIfNeeded()
+    }
+
+    /// macOS does not gate `~/.claude`, so nothing would stop Islet reading it
+    /// silently. Ask once instead, and leave the feature off unless told otherwise.
+    private func askAboutClaudeIfNeeded() {
+        let prefs = Preferences.shared
+        guard !prefs.claudeConsentAsked else { return }
+        prefs.claudeConsentAsked = true
+
+        let transcripts = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".claude/projects")
+        guard FileManager.default.fileExists(atPath: transcripts.path) else { return }
+
+        let alert = NSAlert()
+        alert.messageText = "Show your Claude Code usage?"
+        alert.informativeText = "Islet can show how much of the current Claude Code window you have used, "
+            + "beside the music controls.\n\n"
+            + "To do that it reads ~/.claude/projects on this Mac: timestamps, token counts and model "
+            + "names only. It never reads the contents of your conversations, and nothing is sent anywhere.\n\n"
+            + "You can change this at any time from the menu bar."
+        alert.addButton(withTitle: "Enable")
+        alert.addButton(withTitle: "Not now")
+        alert.alertStyle = .informational
+
+        NSApp.activate(ignoringOtherApps: true)
+        prefs.showClaudeUsage = alert.runModal() == .alertFirstButtonReturn
+        controller.updateClaudeMonitor()
     }
 
     private func setupStatusItem() {
@@ -54,7 +82,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func openTimer() { controller.open(tab: .timer) }
     @objc private func togglePeek() { Preferences.shared.showPeek.toggle() }
     @objc private func toggleChime() { Preferences.shared.chimeEnabled.toggle() }
-    @objc private func toggleClaude() { Preferences.shared.showClaudeUsage.toggle() }
+    @objc private func toggleClaude() {
+        Preferences.shared.showClaudeUsage.toggle()
+        controller.updateClaudeMonitor()
+    }
     @objc private func toggleBattery() { Preferences.shared.showBatteryAlerts.toggle() }
 
     @objc private func toggleLockScreen() {

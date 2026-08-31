@@ -53,7 +53,16 @@ final class NotchController {
             ))
         }
         battery.start()
-        state.claude.start()
+        updateClaudeMonitor()
+    }
+
+    /// Claude Code transcripts are only read once the feature is switched on.
+    func updateClaudeMonitor() {
+        if state.prefs.showClaudeUsage {
+            state.claude.start()
+        } else {
+            state.claude.stop()
+        }
     }
 
     // MARK: - Window

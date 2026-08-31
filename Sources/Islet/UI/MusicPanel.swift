@@ -14,7 +14,7 @@ struct MusicPanel: View {
         HStack(spacing: 12) {
             artwork
             transport
-            if state.prefs.showClaudeUsage {
+            if state.showsClaude {
                 Rectangle()
                     .fill(Color.white.opacity(0.08))
                     .frame(width: 1, height: 58)
@@ -130,7 +130,11 @@ struct ClaudeUsageColumn: View {
 
     private var accent: Color {
         guard let window else { return .white.opacity(0.4) }
-        return window.limitReached ? .red : Color(red: 0.87, green: 0.64, blue: 0.46)
+        if window.limitReached { return .red }
+        guard let percent = window.percent else { return Color(red: 0.87, green: 0.64, blue: 0.46) }
+        if percent > 0.85 { return Color(red: 1, green: 0.55, blue: 0.4) }
+        if percent > 0.6 { return Color(red: 1, green: 0.78, blue: 0.42) }
+        return Color(red: 0.87, green: 0.64, blue: 0.46)
     }
 
     var body: some View {

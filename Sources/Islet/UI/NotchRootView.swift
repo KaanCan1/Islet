@@ -19,7 +19,7 @@ struct NotchRootView: View {
         }
         .frame(width: Layout.windowWidth, height: Layout.windowHeight, alignment: .top)
         .animation(spring, value: state.isExpanded)
-        .animation(spring, value: state.tab)
+        .animation(spring, value: state.effectiveTab)
         .animation(spring, value: state.showsPeek)
         .animation(spring, value: state.activity)
     }
@@ -57,7 +57,7 @@ struct NotchRootView: View {
                 .transition(.opacity)
         } else if state.isExpanded {
             Group {
-                switch state.tab {
+                switch state.effectiveTab {
                 case .music: MusicPanel(music: music, state: state, claude: state.claude)
                 case .timer: TimerPanel(pomodoro: pomodoro, state: state)
                 case .claude: ClaudePanel(claude: state.claude)
@@ -78,10 +78,10 @@ struct NotchRootView: View {
                 } label: {
                     Image(systemName: tab.icon)
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(state.tab == tab ? .white : .white.opacity(0.45))
+                        .foregroundStyle(state.effectiveTab == tab ? .white : .white.opacity(0.45))
                         .frame(width: 29, height: 19)
                         .background(
-                            Capsule().fill(Color.white.opacity(state.tab == tab ? 0.16 : 0))
+                            Capsule().fill(Color.white.opacity(state.effectiveTab == tab ? 0.16 : 0))
                         )
                         .contentShape(Capsule())
                 }
