@@ -1,11 +1,12 @@
 import SwiftUI
 
-/// Detail view for Claude Code usage.
+/// Detail view for Claude Code usage: both rate-limit windows, how much of each
+/// is gone, and when they reset.
 ///
-/// It reports what has been spent, not how close you are to the limit: the
-/// account's ceiling is not recorded anywhere locally, and the recorded rate
-/// limits do not agree on one — see ClaudeUsageMonitor. A percentage appears
-/// only when a budget has been set by hand.
+/// The figures come from Claude's own usage endpoint when its token is
+/// reachable, and are estimated from transcripts when it is not — the footnote
+/// says which, because the two are not equally trustworthy. See ClaudeUsageAPI
+/// and ClaudeUsageMonitor.
 struct ClaudePanel: View {
     @ObservedObject var claude: ClaudeUsageMonitor
 
@@ -51,8 +52,8 @@ struct ClaudePanel: View {
             }
 
             if let snapshot = claude.snapshot {
-                WindowRow(title: "This 5-hour block", window: snapshot.fiveHour, showsClock: true)
-                WindowRow(title: "Last 7 days", window: snapshot.sevenDay, showsClock: false)
+                WindowRow(title: "This 5-hour block", window: snapshot.fiveHour)
+                WindowRow(title: "Last 7 days", window: snapshot.sevenDay)
 
                 Text(footnote(for: snapshot))
                     .font(.system(size: 8.5))
@@ -73,8 +74,6 @@ struct ClaudePanel: View {
 private struct WindowRow: View {
     var title: String
     var window: ClaudeWindow
-    /// Only the five-hour row prints its reset time; the week's is further off.
-    var showsClock: Bool
 
     private var accent: Color {
         if window.limitReached { return .red }
@@ -126,7 +125,7 @@ private struct WindowRow: View {
         // at it. Printing it next to an exact figure just contradicts it.
         if !window.isExact, let ceiling = window.ceilingText { text += " of \(ceiling)" }
         text += " of use"
-        if showsClock { text += " · resets in " + window.remainingText }
+        if window.resetsAt != nil { text += " · resets in " + window.remainingText }
         return text
     }
 }
