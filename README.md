@@ -10,11 +10,15 @@ disappears completely.
 <img src="docs/claude.png" width="470" alt="Claude usage panel">
 
 **Music** — now playing from Spotify or Apple Music: large artwork, a scrubbable
-progress bar and transport controls. Click the artwork to jump to the app it's
-playing in. **Claude** — how much you have spent in the current Claude Code
-five-hour block, next to it; click for the week too. **Timer** — a pomodoro with Focus and Break modes.
-Plus battery alerts when the charger goes in or out, and an option to stay on
-the lock screen.
+progress bar and transport controls. Click the artwork to jump to the app it is
+playing in.
+
+**Claude** — how much of the current Claude Code five-hour block you have spent,
+beside the transport. Click it for the weekly window too. The column and its tab
+disappear entirely if you don't use Claude Code.
+
+**Timer** — a pomodoro with Focus and Break modes. Plus battery alerts when the
+charger goes in or out, and an option to stay visible on the lock screen.
 
 While something is playing, a small summary sits beside the notch:
 
@@ -41,6 +45,10 @@ the music panel needs it. **Accessibility** is only requested if you use the
 transport buttons while something other than Spotify or Music is playing. Battery
 readings need no permission.
 
+Islet also asks once, itself, before reading anything under `~/.claude`. macOS
+does not gate that directory, so nothing would stop an app reading it silently;
+answering "Not now" leaves the feature off and nothing is read.
+
 ## Notes
 
 - Now playing comes from AppleScript, not private APIs: macOS 15.4 closed
@@ -60,7 +68,7 @@ readings need no permission.
 - Token totals exclude cache reads, which otherwise dwarf everything else. The
   five-hour window is timed from the first request after the previous window ran
   out, not rounded to the hour — rounding put the reset time up to an hour out.
-- Hourly scanning is incremental: only bytes appended since the last pass are
+- Scanning is incremental: only bytes appended since the last pass are
   read, so just the first scan is slow (about 12 seconds for 380 MB of
   transcripts, on a background thread). It refreshes every minute and the panel
   has a refresh button.
