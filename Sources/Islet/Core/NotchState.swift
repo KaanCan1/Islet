@@ -63,7 +63,7 @@ final class NotchState: ObservableObject {
     /// to show. With no Claude Code sessions on the machine it disappears
     /// entirely, leaving music and timer.
     var showsClaude: Bool {
-        prefs.showClaudeUsage && (claude.snapshot != nil || claude.isScanning)
+        prefs.showClaudeUsage && claude.snapshot != nil
     }
 
     var visibleTabs: [Tab] {
@@ -164,9 +164,14 @@ final class NotchState: ObservableObject {
     }
 
     /// Expanded: the body, the tab bar under it, and slack around both.
+    ///
+    /// Sized to the tallest tab rather than the current one. Switching from a tall
+    /// tab to a short one otherwise leaves the cursor below the new hit rect —
+    /// which collapses the panel the instant you click the tab you wanted.
     var expandedHitRect: CGRect {
+        let tallest = Tab.allCases.map(\.height).max() ?? effectiveTab.height
         let size = CGSize(width: expandedSize.width + Layout.hoverSlack * 2,
-                          height: expandedSize.height)
+                          height: notchSize.height + tallest)
         return rect(size: size, extraBottom: Layout.tabBarGap + Layout.tabBarHeight + Layout.hoverSlack)
     }
 }
