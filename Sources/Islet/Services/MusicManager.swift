@@ -103,7 +103,7 @@ final class MusicManager: ObservableObject {
             return
         }
 
-        var fallback: (TrackInfo, Double)?
+        var fallback: (TrackInfo, Double?)?
         for app in candidates {
             guard let raw = await AppleScriptRunner.shared.run(Self.nowPlayingScript(for: app)),
                   raw != "NA",
@@ -122,11 +122,12 @@ final class MusicManager: ObservableObject {
         }
     }
 
-    private func apply(_ info: TrackInfo, position newPosition: Double) {
+    private func apply(_ info: TrackInfo, position newPosition: Double?) {
         let changed = info != track
         if changed { track = info }
-        // Don't make the bar jump for sub-second drift.
-        if abs(newPosition - position) > 1.5 || changed {
+        // A nil position means the player wouldn't report one; keep counting
+        // locally rather than snapping the bar back to zero.
+        if let newPosition, changed || abs(newPosition - position) > 1.5 {
             position = newPosition
         }
         if info.artworkKey != lastArtworkKey || (artwork == nil && !info.isEmpty) {
@@ -144,7 +145,7 @@ final class MusicManager: ObservableObject {
         }
     }
 
-    private func parse(_ raw: String, source: PlayerApp) -> (TrackInfo, Double)? {
+    private func parse(_ raw: String, source: PlayerApp) -> (TrackInfo, Double?)? {
         let f = raw.components(separatedBy: "\t")
         guard f.count >= 9 else { return nil }
         var info = TrackInfo()
@@ -157,7 +158,7 @@ final class MusicManager: ObservableObject {
         info.shuffle = f[7] == "true"
         info.repeatOn = f[8] == "true"
         info.source = source
-        return (info, Double(f[4]) ?? 0)
+        return (info, f[4].isEmpty ? nil : Double(f[4]))
     }
 
     // MARK: - Artwork
@@ -290,14 +291,14 @@ final class MusicManager: ObservableObject {
             		set repeatFlag to (repeating as text)
             	end try
             	set trackLength to 0
-            	set trackSpot to 0
+            	set trackSpot to ""
             	try
             		set trackLength to ((duration of theTrack) div 1000)
             	end try
             	try
-            		set trackSpot to (round (player position))
+            		set trackSpot to (((player position) div 1) as text)
             	end try
-            	return (name of theTrack) & tab & (artist of theTrack) & tab & (album of theTrack) & tab & (trackLength as text) & tab & (trackSpot as text) & tab & playerStatus & tab & coverURL & tab & shuffleFlag & tab & repeatFlag
+            	return (name of theTrack) & tab & (artist of theTrack) & tab & (album of theTrack) & tab & (trackLength as text) & tab & trackSpot & tab & playerStatus & tab & coverURL & tab & shuffleFlag & tab & repeatFlag
             end tell
             """
         case .music:
@@ -321,14 +322,14 @@ final class MusicManager: ObservableObject {
             		set trackKey to (persistent ID of theTrack)
             	end try
             	set trackLength to 0
-            	set trackSpot to 0
+            	set trackSpot to ""
             	try
-            		set trackLength to (round (duration of theTrack))
+            		set trackLength to ((duration of theTrack) div 1)
             	end try
             	try
-            		set trackSpot to (round (player position))
+            		set trackSpot to (((player position) div 1) as text)
             	end try
-            	return (name of theTrack) & tab & (artist of theTrack) & tab & (album of theTrack) & tab & (trackLength as text) & tab & (trackSpot as text) & tab & playerStatus & tab & trackKey & tab & shuffleFlag & tab & repeatFlag
+            	return (name of theTrack) & tab & (artist of theTrack) & tab & (album of theTrack) & tab & (trackLength as text) & tab & trackSpot & tab & playerStatus & tab & trackKey & tab & shuffleFlag & tab & repeatFlag
             end tell
             """
         case .none:
