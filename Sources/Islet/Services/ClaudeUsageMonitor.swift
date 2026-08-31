@@ -121,13 +121,15 @@ final class ClaudeUsageMonitor: ObservableObject {
         guard !isScanning else { return }
         isScanning = true
         Task {
-            await fetchIfDue()
-            let current = reading
-            let result: Snapshot? = await withCheckedContinuation { continuation in
-                queue.async { continuation.resume(returning: Store.shared.refreshAndSummarise(api: current)) }
-            }
-            snapshot = result
+            // Local numbers first. Reading the keychain can sit behind a macOS
+            // permission prompt for as long as nobody answers it, and that must
+            // never be what stops the panel from showing anything.
+            snapshot = await summarise(with: reading)
             isScanning = false
+
+            if await fetchIfDue() {
+                snapshot = await summarise(with: reading)
+            }
         }
     }
 
@@ -137,10 +139,19 @@ final class ClaudeUsageMonitor: ObservableObject {
         refresh()
     }
 
-    private func fetchIfDue() async {
-        if let lastFetch, Date().timeIntervalSince(lastFetch) < fetchInterval { return }
+    private func summarise(with api: ClaudeUsageAPI.Reading?) async -> Snapshot? {
+        await withCheckedContinuation { continuation in
+            queue.async { continuation.resume(returning: Store.shared.refreshAndSummarise(api: api)) }
+        }
+    }
+
+    /// Returns true when a new reading arrived and the summary is worth redoing.
+    private func fetchIfDue() async -> Bool {
+        if let lastFetch, Date().timeIntervalSince(lastFetch) < fetchInterval { return false }
         lastFetch = Date()
-        if case .success(let value) = await ClaudeUsageAPI.fetch() { reading = value }
+        guard case .success(let value) = await ClaudeUsageAPI.fetch() else { return false }
+        reading = value
+        return true
     }
 
     /// One-shot read for diagnostics.

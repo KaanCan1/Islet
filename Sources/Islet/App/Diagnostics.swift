@@ -54,9 +54,10 @@ enum Diagnostics {
 
         if let usage = ClaudeUsageMonitor.probe() {
             for (label, window) in [("5-hour block", usage.fiveHour), ("7 days      ", usage.sevenDay)] {
-                let ceiling = window.ceilingText ?? "no ceiling recorded"
-                let percent = window.percentText.map { " (\($0))" } ?? ""
-                print("Claude \(label): \(window.usageText) of use, ceiling \(ceiling)\(percent), "
+                let percent = window.percentText.map {
+                    "\($0) \(window.isExact ? "(exact)" : "(estimated from \(window.ceilingText ?? "?"))")"
+                } ?? "no percentage available"
+                print("Claude \(label): \(percent), \(window.usageText) of use, "
                       + "\(window.tokensText) tokens, resets in \(window.remainingText)"
                       + (window.limitReached ? " — rate limited" : ""))
             }

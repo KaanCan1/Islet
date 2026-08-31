@@ -122,7 +122,9 @@ private struct WindowRow: View {
             return "rate limited · resets in " + window.remainingText
         }
         var text = window.usageText
-        if let ceiling = window.ceilingText { text += " of \(ceiling)" }
+        // The learned ceiling only explains the percentage while we are guessing
+        // at it. Printing it next to an exact figure just contradicts it.
+        if !window.isExact, let ceiling = window.ceilingText { text += " of \(ceiling)" }
         text += " of use"
         if showsClock { text += " · resets in " + window.remainingText }
         return text
