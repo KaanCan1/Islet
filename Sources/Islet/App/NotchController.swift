@@ -16,6 +16,13 @@ final class NotchController {
         state.music.start()
         startMonitors()
 
+        // Documentation hook: ISLET_DEMO=music|timer holds the panel open on one
+        // tab so screenshots for the README are reproducible.
+        if let demo = ProcessInfo.processInfo.environment["ISLET_DEMO"] {
+            state.tab = demo.lowercased() == "timer" ? .timer : .music
+            state.forceExpandUntil = .distantFuture
+        }
+
         NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
             object: nil,

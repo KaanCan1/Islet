@@ -108,6 +108,11 @@ ISLET_DEBUG=1 open dist/Islet.app
 ```
 
 ```bash
+# Hold the panel open on one tab, for reproducible documentation screenshots
+ISLET_DEMO=music ./dist/Islet.app/Contents/MacOS/Islet
+```
+
+```bash
 ISLET_SCRIPT='tell application id "com.spotify.client" to return name of current track' ./dist/Islet.app/Contents/MacOS/Islet --diagnose
 ```
 
