@@ -57,23 +57,28 @@ answering "Not now" leaves the feature off and nothing is read.
   timestamps, token counts and model names, never message content, and nothing
   leaves the machine. Islet asks before it reads any of it, and the whole thing
   stays hidden if you have never used Claude Code.
-- **Usage is measured as time, not tokens.** Nothing on disk says what Claude
-  counts, so it was worked out from the moments this account was actually cut
-  off. Across those, the tokens standing in the window varied by 3.5x (1.2M to
-  4.3M) while the minutes spent varied far less. Checked against a figure read
-  out of Claude Code's own `/usage`, the time measure predicted 72% where the
-  truth was 77%; tokens were out by up to 2x.
-- **The ceiling is learned, not configured.** It is the largest usage standing in
-  a window at the moments Claude Code cut you off, and it corrects itself: run
-  past it without being cut off and it moves up, so a plan change or a promo
-  works its way in on its own. It needs two rejections before it will show a
-  percentage — the single seven-day rejection on the machine this was built on
-  predated a "+50% weekly limits" promo and would have reported 99% against a
-  real 33%. Until then the window shows hours used and its reset time.
-- Expect the percentage to be a guide rather than a readout. Across the four
-  rejections here the same measure landed between 50 and 89 minutes, so roughly a
-  quarter of spread is baked in; it is the closest thing derivable without an API
-  that reports the real figure.
+- **The real figures come from Claude's own usage endpoint** when it can be
+  reached: `GET /api/oauth/usage` on api.anthropic.com, the same one `/usage`
+  reads, which answers with the actual utilisation and reset time. It needs the
+  OAuth token the `claude` CLI writes to the login keychain. If you only ever run
+  Claude Code from the desktop app there is no such token — that install keeps its
+  session in the app's own encrypted storage — and Islet falls back to estimating
+  from transcripts. Log in once with the CLI and it switches over on its own.
+- **The estimate measures time, not tokens.** Nothing on disk says what Claude
+  counts, so it was worked out from the moments this account was cut off: across
+  those, the tokens standing in the window varied by 3.5x (1.2M to 4.3M) while
+  the minutes spent varied far less. Against a figure read out of `/usage`, the
+  time measure predicted 72% where the truth was 77%; tokens were out by up to 2x.
+- **The estimated ceiling is learned, not configured**: the largest usage standing
+  in a window when Claude Code cut you off. Run past it without being cut off and
+  it moves up, so a plan change works its way in on its own. Two rejections are
+  required before any percentage appears — the single seven-day rejection here
+  predated a "+50% weekly limits" promo and would have claimed 99% against a real
+  33%. Expect roughly a quarter of spread while estimating; the endpoint above is
+  the only exact source.
+- Reset times land on ten-minute boundaries, and a recorded rejection carries the
+  server's own. Both are used, which took the average error against known resets
+  from 6.2 minutes to 5.0.
 - Scanning is incremental: only bytes appended since the last pass are
   read, so just the first scan is slow (about 12 seconds for 380 MB of
   transcripts, on a background thread). It refreshes every minute and the panel

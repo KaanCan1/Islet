@@ -20,9 +20,11 @@ struct ClaudePanel: View {
 
     /// Measured as time spent, not tokens: see ClaudeWindow for why.
     private func footnote(for snapshot: ClaudeUsageMonitor.Snapshot) -> String {
-        snapshot.fiveHour.ceilingSeconds == nil && snapshot.sevenDay.ceilingSeconds == nil
-            ? "no ceiling learned yet — it appears once a limit is hit"
-            : "~ ceiling learned from when Claude Code cut you off"
+        if snapshot.fiveHour.isExact { return "figures from Claude's usage API" }
+        if snapshot.fiveHour.ceilingSeconds == nil && snapshot.sevenDay.ceilingSeconds == nil {
+            return "estimated — no ceiling learned yet"
+        }
+        return "estimated from when Claude Code last cut you off"
     }
 
     var body: some View {
@@ -37,7 +39,7 @@ struct ClaudePanel: View {
                     .font(.system(size: 9))
                     .foregroundStyle(.white.opacity(0.3))
                     .monospacedDigit()
-                IconButton(symbol: "arrow.clockwise", size: 9) { claude.refresh() }
+                IconButton(symbol: "arrow.clockwise", size: 9) { claude.refreshNow() }
                     .disabled(claude.isScanning)
                     .rotationEffect(.degrees(claude.isScanning ? 360 : 0))
                     .animation(

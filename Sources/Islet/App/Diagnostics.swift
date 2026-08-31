@@ -34,6 +34,24 @@ enum Diagnostics {
             print("Battery: no power source reported (desktop Mac?)")
         }
 
+        let box = APIBox()
+        let semaphore = DispatchSemaphore(value: 0)
+        Task { box.result = await ClaudeUsageAPI.fetch(); semaphore.signal() }
+        while box.result == nil, semaphore.wait(timeout: .now()) == .timedOut {
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.05))
+        }
+        switch box.result {
+        case .success(let reading):
+            let five = reading.fiveHour.map { "\(Int($0.utilization * 100))%" } ?? "not reported"
+            let seven = reading.sevenDay.map { "\(Int($0.utilization * 100))%" } ?? "not reported"
+            print("Claude usage API: five_hour \(five), seven_day \(seven)")
+        case .failure(let failure):
+            print("Claude usage API: unavailable (\(failure)) — falling back to transcripts")
+            print("  keychain: \(ClaudeUsageAPI.tokenStatus())")
+        case nil:
+            print("Claude usage API: timed out")
+        }
+
         if let usage = ClaudeUsageMonitor.probe() {
             for (label, window) in [("5-hour block", usage.fiveHour), ("7 days      ", usage.sevenDay)] {
                 let ceiling = window.ceilingText ?? "no ceiling recorded"
@@ -91,6 +109,10 @@ enum Diagnostics {
         case .failure(let failure): return "     error \(failure.code): \(failure.localizedHint)"
         case nil: return "     timed out"
         }
+    }
+
+    private final class APIBox {
+        var result: Result<ClaudeUsageAPI.Reading, ClaudeUsageAPI.Failure>?
     }
 
     private final class ResultBox {
