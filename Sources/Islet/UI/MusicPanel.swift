@@ -18,7 +18,7 @@ struct MusicPanel: View {
                 Rectangle()
                     .fill(Color.white.opacity(0.08))
                     .frame(width: 1, height: 58)
-                ClaudeUsageColumn(snapshot: claude.snapshot)
+                ClaudeUsageColumn(snapshot: claude.snapshot) { state.tab = .claude }
                     .frame(width: 92)
             }
         }
@@ -117,17 +117,23 @@ struct MusicPanel: View {
     }
 }
 
-/// How much of Claude Code's five-hour window is left, read from its own
-/// transcripts. See ClaudeUsageMonitor for where the numbers come from.
+/// Compact five-hour usage, shown beside the transport. Tapping it opens the
+/// full Claude panel.
 struct ClaudeUsageColumn: View {
     var snapshot: ClaudeUsageMonitor.Snapshot?
+    var onTap: () -> Void
+
+    @State private var hovering = false
+
+    private var window: ClaudeWindow? { snapshot?.fiveHour }
 
     private var accent: Color {
-        guard let snapshot else { return .white.opacity(0.4) }
-        if snapshot.limitReached { return .red }
-        return snapshot.windowProgress > 0.85
-            ? Color(red: 1, green: 0.72, blue: 0.35)
-            : Color(red: 0.85, green: 0.6, blue: 0.45)
+        guard let window else { return .white.opacity(0.4) }
+        if window.limitReached { return .red }
+        guard let percent = window.percent else { return .white.opacity(0.55) }
+        if percent > 0.85 { return Color(red: 1, green: 0.55, blue: 0.4) }
+        if percent > 0.6 { return Color(red: 1, green: 0.78, blue: 0.42) }
+        return Color(red: 0.85, green: 0.62, blue: 0.45)
     }
 
     var body: some View {
@@ -135,11 +141,11 @@ struct ClaudeUsageColumn: View {
             Text("CLAUDE")
                 .font(.system(size: 8.5, weight: .semibold))
                 .tracking(0.8)
-                .foregroundStyle(.white.opacity(0.35))
+                .foregroundStyle(.white.opacity(hovering ? 0.55 : 0.35))
 
-            if let snapshot {
-                Text(snapshot.limitReached ? "limit" : snapshot.remainingText)
-                    .font(.system(size: 16, weight: .medium, design: .rounded))
+            if let window {
+                Text(window.limitReached ? "limit" : window.percentText)
+                    .font(.system(size: 17, weight: .medium, design: .rounded))
                     .foregroundStyle(accent)
                     .monospacedDigit()
                     .lineLimit(1)
@@ -149,18 +155,18 @@ struct ClaudeUsageColumn: View {
                         Capsule().fill(Color.white.opacity(0.14))
                         Capsule()
                             .fill(accent.opacity(0.9))
-                            .frame(width: max(3, geo.size.width * snapshot.windowProgress))
+                            .frame(width: max(3, geo.size.width * (window.percent ?? 0)))
                     }
                 }
                 .frame(height: 3)
 
-                Text("\(snapshot.tokenText) tokens")
+                Text(window.remainingText + " left")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(.white.opacity(0.4))
                     .lineLimit(1)
             } else {
                 Text("—")
-                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                    .font(.system(size: 17, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.3))
                 Text("no session")
                     .font(.system(size: 9, weight: .medium))
@@ -168,6 +174,9 @@ struct ClaudeUsageColumn: View {
             }
         }
         .frame(maxHeight: .infinity, alignment: .center)
-        .help("Time left in the current Claude Code usage window")
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .onTapGesture(perform: onTap)
+        .help("Claude Code usage — click for the weekly window too")
     }
 }

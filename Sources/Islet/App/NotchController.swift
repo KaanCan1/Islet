@@ -20,7 +20,7 @@ final class NotchController {
         // tab so screenshots for the README are reproducible. Deliberately time
         // limited — a panel stuck open forever is worse than a missed capture.
         if let demo = ProcessInfo.processInfo.environment["ISLET_DEMO"] {
-            state.tab = demo.lowercased() == "timer" ? .timer : .music
+            state.tab = NotchState.Tab(rawValue: demo.lowercased()) ?? .music
             state.forceExpandUntil = Date().addingTimeInterval(120)
         }
 

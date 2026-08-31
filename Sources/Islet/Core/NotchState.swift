@@ -4,10 +4,24 @@ import Combine
 @MainActor
 final class NotchState: ObservableObject {
     enum Tab: String, CaseIterable, Identifiable {
-        case music, timer
+        case music, timer, claude
         var id: String { rawValue }
-        var icon: String { self == .music ? "music.note" : "timer" }
-        var height: CGFloat { self == .music ? Layout.musicHeight : Layout.timerHeight }
+
+        var icon: String {
+            switch self {
+            case .music: return "music.note"
+            case .timer: return "timer"
+            case .claude: return "gauge.medium"
+            }
+        }
+
+        var height: CGFloat {
+            switch self {
+            case .music: return Layout.musicHeight
+            case .timer: return Layout.timerHeight
+            case .claude: return Layout.claudeHeight
+            }
+        }
     }
 
     @Published var isExpanded = false
@@ -43,6 +57,11 @@ final class NotchState: ObservableObject {
                 self?.forceExpandUntil = Date().addingTimeInterval(6)
             }
             .store(in: &bag)
+    }
+
+    /// The Claude tab only exists when the usage column is switched on.
+    var visibleTabs: [Tab] {
+        prefs.showClaudeUsage ? Tab.allCases : Tab.allCases.filter { $0 != .claude }
     }
 
     // MARK: - Transient alerts

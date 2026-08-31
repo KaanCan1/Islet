@@ -7,11 +7,12 @@ disappears completely.
 
 <img src="docs/music.png" width="470" alt="Music panel">
 <img src="docs/timer.png" width="470" alt="Timer panel">
+<img src="docs/claude.png" width="470" alt="Claude usage panel">
 
 **Music** — now playing from Spotify or Apple Music: large artwork, a scrubbable
 progress bar and transport controls. Click the artwork to jump to the app it's
-playing in. **Claude** — how much of the current Claude Code five-hour usage
-window is left, next to it. **Timer** — a pomodoro with Focus and Break modes.
+playing in. **Claude** — what percentage of the Claude Code five-hour
+window is gone, next to it; click for the weekly window too. **Timer** — a pomodoro with Focus and Break modes.
 Plus battery alerts when the charger goes in or out, and an option to stay on
 the lock screen.
 
@@ -44,10 +45,14 @@ readings need no permission.
 
 - Now playing comes from AppleScript, not private APIs: macOS 15.4 closed
   `MediaRemote` to unentitled apps.
-- The Claude column reads `~/.claude/projects/*.jsonl` locally — only timestamps
-  and token counts, never message content, and nothing leaves the machine. There
-  is no live quota figure on disk, so the five-hour window is reconstructed from
-  those timestamps. Turn the column off from the menu bar item.
+- The Claude figures come from `~/.claude/projects/*.jsonl`, read locally — only
+  timestamps and token counts, never message content, and nothing leaves the
+  machine. No live quota is written anywhere, so the ceilings are derived from the
+  moments the account actually *was* rate limited: the tokens standing in that
+  window at the point of rejection is the limit, which is why they are shown with
+  a `~`. Hourly totals are cached in Application Support, so only the first scan
+  is slow (about 12 seconds for 380 MB of transcripts, on a background thread).
+  Turn the whole thing off from the menu bar item.
 - Displays without a notch get a virtual one at the top centre of the screen.
 - In full-screen apps macOS slides the menu bar down the moment the cursor
   touches the top edge. That's the system, not Islet. To stop it: System Settings

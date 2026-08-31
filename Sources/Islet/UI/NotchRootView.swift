@@ -60,6 +60,7 @@ struct NotchRootView: View {
                 switch state.tab {
                 case .music: MusicPanel(music: music, state: state, claude: state.claude)
                 case .timer: TimerPanel(pomodoro: pomodoro, state: state)
+                case .claude: ClaudePanel(claude: state.claude)
                 }
             }
             .transition(.opacity)
@@ -71,7 +72,7 @@ struct NotchRootView: View {
 
     private var tabBar: some View {
         HStack(spacing: 2) {
-            ForEach(NotchState.Tab.allCases) { tab in
+            ForEach(state.visibleTabs) { tab in
                 Button {
                     state.tab = tab
                 } label: {

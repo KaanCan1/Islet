@@ -35,10 +35,13 @@ enum Diagnostics {
         }
 
         if let usage = ClaudeUsageMonitor.probe() {
-            print("Claude window: \(usage.tokenText) tokens, resets in \(usage.remainingText)"
-                  + (usage.limitReached ? " (limit reached)" : ""))
+            let five = usage.fiveHour, seven = usage.sevenDay
+            print("Claude 5-hour: \(five.tokensText) of \(five.limitText) (\(five.percentText)), "
+                  + "resets in \(five.remainingText)\(five.limitReached ? " — limit reached" : "")")
+            print("Claude 7-day : \(seven.tokensText) of \(seven.limitText) (\(seven.percentText)), "
+                  + "resets in \(seven.remainingText)\(seven.limitReached ? " — limit reached" : "")")
         } else {
-            print("Claude window: no recent Claude Code sessions found")
+            print("Claude usage: no recent Claude Code sessions found")
         }
 
         // Debug hook: ISLET_SCRIPT runs any AppleScript under the app's own
