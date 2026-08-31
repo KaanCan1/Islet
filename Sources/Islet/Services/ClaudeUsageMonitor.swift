@@ -6,24 +6,44 @@ private let sevenDayWindow: TimeInterval = 7 * 86400
 /// weekly ceiling is derived from.
 private let scanHorizon: TimeInterval = 30 * 86400
 
-/// Usage of one rate-limit window.
+/// Usage measured over one rate-limit window.
+///
+/// There is deliberately no "percent of your limit" here. The account's actual
+/// ceiling is not written anywhere on disk, and it cannot be inferred from the
+/// rejections either: across the recorded rate limits on this machine the block
+/// totals ranged from 1.2M to 4.3M tokens ($133 to $435 of equivalent API
+/// spend), so no single number explains them. A percentage is only shown when
+/// the user supplies their own budget.
 struct ClaudeWindow: Equatable {
     var tokens: Int
-    /// Ceiling derived from moments the account was actually rate limited.
-    /// Nil when no rejection has ever been recorded for this window.
-    var limit: Int?
+    /// Equivalent API spend at published per-model rates. On a subscription this
+    /// is notional — a sense of magnitude, not a bill.
+    var cost: Double
     var resetsAt: Date?
     var limitReached: Bool
+    /// Optional user-supplied token budget; enables a percentage.
+    var budget: Int?
 
     var percent: Double? {
-        guard let limit, limit > 0 else { return nil }
-        return min(Double(tokens) / Double(limit), 1)
+        guard let budget, budget > 0 else { return nil }
+        return min(Double(tokens) / Double(budget), 1)
     }
 
-    var percentText: String {
-        guard let percent else { return "—" }
-        return "\(Int((percent * 100).rounded()))%"
+    var percentText: String? {
+        percent.map { "\(Int(($0 * 100).rounded()))%" }
     }
+
+    var costText: String {
+        cost >= 100 ? String(format: "$%.0f", cost) : String(format: "$%.2f", cost)
+    }
+
+    /// How far through the window's clock we are — this one is factual.
+    var elapsedFraction: Double {
+        guard let resetsAt, length > 0 else { return 0 }
+        return min(max(1 - resetsAt.timeIntervalSinceNow / length, 0), 1)
+    }
+
+    var length: TimeInterval = fiveHourWindow
 
     var remainingText: String {
         guard let resetsAt else { return "no reset recorded" }
@@ -43,7 +63,6 @@ struct ClaudeWindow: Equatable {
     }
 
     var tokensText: String { Self.tokenText(tokens) }
-    var limitText: String { limit.map { "~" + Self.tokenText($0) } ?? "?" }
 }
 
 /// Reads Claude Code's own session transcripts to report how much of the
@@ -87,7 +106,8 @@ final class ClaudeUsageMonitor: ObservableObject {
         timer = nil
     }
 
-    private func refresh() {
+    /// Rescans now. Called on a timer every minute, and by the refresh button.
+    func refresh() {
         guard !isScanning else { return }
         isScanning = true
         queue.async {
@@ -112,8 +132,12 @@ private struct Rejection: Codable, Equatable {
 }
 
 private struct Cache: Codable {
+    /// Bumped when the shape changes, which forces a fresh scan.
+    var version = 2
     /// Hour bucket (seconds since epoch, floored to the hour) -> tokens.
     var buckets: [Int: Int] = [:]
+    /// Same buckets, in equivalent API dollars.
+    var costs: [Int: Double] = [:]
     /// File path -> bytes already consumed.
     var offsets: [String: UInt64] = [:]
     var rejections: [Rejection] = []
@@ -141,7 +165,8 @@ private final class Store: @unchecked Sendable {
         if !loaded {
             loaded = true
             if let data = try? Data(contentsOf: cacheURL),
-               let decoded = try? JSONDecoder().decode(Cache.self, from: data) {
+               let decoded = try? JSONDecoder().decode(Cache.self, from: data),
+               decoded.version == Cache().version {
                 cache = decoded
             }
         }
@@ -219,10 +244,11 @@ private final class Store: @unchecked Sendable {
         if text.contains("\"quotaLimits\"") { ingestRejection(text) }
         guard text.contains("\"usage\"") else { return }
         guard let date = timestamp(in: text) else { return }
-        let tokens = tokenCount(in: text)
-        guard tokens > 0 else { return }
+        let counts = tokenCounts(in: text)
+        guard counts.billable > 0 else { return }
         let hour = Int(date.timeIntervalSince1970 / 3600) * 3600
-        cache.buckets[hour, default: 0] += tokens
+        cache.buckets[hour, default: 0] += counts.billable
+        cache.costs[hour, default: 0] += cost(of: counts, model: model(in: text))
     }
 
     private func ingestRejection(_ text: String) {
@@ -250,21 +276,52 @@ private final class Store: @unchecked Sendable {
         return isoFormatter.date(from: String(rest[..<end]))
     }
 
-    /// Sums the tokens that count as consumption. Cache reads are excluded: they
-    /// dwarf everything else and would drown the signal.
-    ///
+    struct TokenCounts {
+        var input = 0, output = 0, cacheWrite = 0, cacheRead = 0
+        /// What is reported as "used": cache reads are excluded because they
+        /// dwarf everything else and drown the signal.
+        var billable: Int { input + output + cacheWrite }
+    }
+
     /// Only the top level `usage` object is read — the `iterations` array below it
     /// repeats the same keys and would double count.
-    private func tokenCount(in text: String) -> Int {
-        guard let usage = text.range(of: "\"usage\":{") else { return 0 }
+    private func tokenCounts(in text: String) -> TokenCounts {
+        guard let usage = text.range(of: "\"usage\":{") else { return TokenCounts() }
         let tail = text[usage.upperBound...]
         let end = tail.range(of: "\"iterations\"")?.lowerBound ?? tail.endIndex
         let slice = tail[..<end]
         // The leading quote matters: it stops "input_tokens" matching inside
         // "cache_creation_input_tokens".
-        return number(after: "\"input_tokens\":", in: slice)
-            + number(after: "\"output_tokens\":", in: slice)
-            + number(after: "\"cache_creation_input_tokens\":", in: slice)
+        return TokenCounts(
+            input: number(after: "\"input_tokens\":", in: slice),
+            output: number(after: "\"output_tokens\":", in: slice),
+            cacheWrite: number(after: "\"cache_creation_input_tokens\":", in: slice),
+            cacheRead: number(after: "\"cache_read_input_tokens\":", in: slice)
+        )
+    }
+
+    private func model(in text: String) -> String {
+        guard let range = text.range(of: "\"model\":\"") else { return "" }
+        let rest = text[range.upperBound...]
+        guard let end = rest.firstIndex(of: "\"") else { return "" }
+        return String(rest[..<end])
+    }
+
+    /// Published per-million rates: input, output, cache write, cache read.
+    /// Subscriptions are not billed this way; this only gives the numbers a
+    /// familiar magnitude.
+    private func cost(of counts: TokenCounts, model: String) -> Double {
+        let rates: (Double, Double, Double, Double)
+        switch true {
+        case model.contains("opus"): rates = (15, 75, 18.75, 1.5)
+        case model.contains("sonnet"): rates = (3, 15, 3.75, 0.3)
+        case model.contains("haiku"): rates = (0.8, 4, 1, 0.08)
+        default: return 0
+        }
+        return (Double(counts.input) * rates.0
+                + Double(counts.output) * rates.1
+                + Double(counts.cacheWrite) * rates.2
+                + Double(counts.cacheRead) * rates.3) / 1_000_000
     }
 
     private func number(after key: String, in slice: Substring) -> Int {
@@ -282,6 +339,7 @@ private final class Store: @unchecked Sendable {
     private func prune() {
         let cutoff = Int(Date().addingTimeInterval(-scanHorizon).timeIntervalSince1970)
         cache.buckets = cache.buckets.filter { $0.key >= cutoff }
+        cache.costs = cache.costs.filter { $0.key >= cutoff }
         let rejectionCutoff = Date().addingTimeInterval(-scanHorizon)
         cache.rejections = cache.rejections.filter { $0.at >= rejectionCutoff }
     }
@@ -310,17 +368,22 @@ private final class Store: @unchecked Sendable {
         let weekStart = now.timeIntervalSince1970 - sevenDayWindow
         let weekTokens = tokens(from: weekStart, to: now.timeIntervalSince1970)
 
+        let defaults = UserDefaults.standard
         let five = ClaudeWindow(
             tokens: fiveTokens,
-            limit: derivedLimit(for: "five_hour", window: fiveHourWindow),
+            cost: cost(from: Double(blockStart), to: now.timeIntervalSince1970),
             resetsAt: fiveReset,
-            limitReached: isRejected("five_hour", now: now)
+            limitReached: isRejected("five_hour", now: now),
+            budget: nonZero(defaults.integer(forKey: "claudeBlockBudget")),
+            length: fiveHourWindow
         )
         let seven = ClaudeWindow(
             tokens: weekTokens,
-            limit: derivedLimit(for: "seven_day", window: sevenDayWindow),
+            cost: cost(from: weekStart, to: now.timeIntervalSince1970),
             resetsAt: projectedWeeklyReset(now: now),
-            limitReached: isRejected("seven_day", now: now)
+            limitReached: isRejected("seven_day", now: now),
+            budget: nonZero(defaults.integer(forKey: "claudeWeekBudget")),
+            length: sevenDayWindow
         )
         return ClaudeUsageMonitor.Snapshot(fiveHour: five, sevenDay: seven, updatedAt: now)
     }
@@ -332,17 +395,19 @@ private final class Store: @unchecked Sendable {
         }
     }
 
-    /// The tokens standing in the window at the moment of a rejection is the
-    /// ceiling. Takes the largest such reading, so a rejection recorded midway
-    /// through a partially scanned window can't understate it.
-    private func derivedLimit(for type: String, window: TimeInterval) -> Int? {
-        let candidates = cache.rejections.filter { $0.type == type }.map { rejection -> Int in
-            let end = rejection.at.timeIntervalSince1970
-            return tokens(from: end - window, to: end)
+    private func cost(from start: TimeInterval, to end: TimeInterval) -> Double {
+        cache.costs.reduce(0) { total, entry in
+            let hour = Double(entry.key)
+            return hour >= start - 3600 && hour <= end ? total + entry.value : total
         }
-        let best = candidates.max() ?? 0
-        return best > 0 ? best : nil
     }
+
+    /// The most recent rate limit recorded for a window, for the detail panel.
+    func lastRejection(_ type: String) -> Date? {
+        cache.rejections.filter { $0.type == type }.map(\.at).max()
+    }
+
+    private func nonZero(_ value: Int) -> Int? { value > 0 ? value : nil }
 
     private func isRejected(_ type: String, now: Date) -> Bool {
         cache.rejections.contains { $0.type == type && $0.resetsAt > now }

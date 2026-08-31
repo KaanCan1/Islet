@@ -11,8 +11,8 @@ disappears completely.
 
 **Music** — now playing from Spotify or Apple Music: large artwork, a scrubbable
 progress bar and transport controls. Click the artwork to jump to the app it's
-playing in. **Claude** — what percentage of the Claude Code five-hour
-window is gone, next to it; click for the weekly window too. **Timer** — a pomodoro with Focus and Break modes.
+playing in. **Claude** — how much you have spent in the current Claude Code
+five-hour block, next to it; click for the week too. **Timer** — a pomodoro with Focus and Break modes.
 Plus battery alerts when the charger goes in or out, and an option to stay on
 the lock screen.
 
@@ -46,13 +46,24 @@ readings need no permission.
 - Now playing comes from AppleScript, not private APIs: macOS 15.4 closed
   `MediaRemote` to unentitled apps.
 - The Claude figures come from `~/.claude/projects/*.jsonl`, read locally — only
-  timestamps and token counts, never message content, and nothing leaves the
-  machine. No live quota is written anywhere, so the ceilings are derived from the
-  moments the account actually *was* rate limited: the tokens standing in that
-  window at the point of rejection is the limit, which is why they are shown with
-  a `~`. Hourly totals are cached in Application Support, so only the first scan
-  is slow (about 12 seconds for 380 MB of transcripts, on a background thread).
-  Turn the whole thing off from the menu bar item.
+  timestamps, token counts and model names, never message content, and nothing
+  leaves the machine. Hourly totals are cached in Application Support, so only the
+  first scan is slow (about 12 seconds for 380 MB of transcripts, on a background
+  thread); after that it refreshes every minute, and the panel has a refresh
+  button. Turn the whole thing off from the menu bar item.
+- **There is deliberately no "percent of your limit."** Nothing on disk states the
+  account's ceiling, and it cannot be inferred from the rate limits that *were*
+  recorded: across the rejections on the machine this was built on, the block
+  totals ranged from 1.2M to 4.3M tokens — $133 to $435 of equivalent API spend —
+  so no single number explains them. What is shown is what can actually be
+  measured: tokens sent (cache reads excluded, they dwarf everything else), the
+  equivalent API cost at published per-model rates, and the block's own clock. If
+  you want a percentage, supply your own budget and one appears:
+
+```bash
+defaults write dev.kaancankurt.islet claudeBlockBudget -int 2000000
+defaults write dev.kaancankurt.islet claudeWeekBudget -int 30000000
+```
 - Displays without a notch get a virtual one at the top centre of the screen.
 - In full-screen apps macOS slides the menu bar down the moment the cursor
   touches the top edge. That's the system, not Islet. To stop it: System Settings

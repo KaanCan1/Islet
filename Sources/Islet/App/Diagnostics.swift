@@ -36,10 +36,9 @@ enum Diagnostics {
 
         if let usage = ClaudeUsageMonitor.probe() {
             let five = usage.fiveHour, seven = usage.sevenDay
-            print("Claude 5-hour: \(five.tokensText) of \(five.limitText) (\(five.percentText)), "
-                  + "resets in \(five.remainingText)\(five.limitReached ? " — limit reached" : "")")
-            print("Claude 7-day : \(seven.tokensText) of \(seven.limitText) (\(seven.percentText)), "
-                  + "resets in \(seven.remainingText)\(seven.limitReached ? " — limit reached" : "")")
+            print("Claude 5-hour block: \(five.tokensText) tokens, \(five.costText) equivalent, "
+                  + "resets in \(five.remainingText)\(five.limitReached ? " — rate limited" : "")")
+            print("Claude 7 days      : \(seven.tokensText) tokens, \(seven.costText) equivalent")
         } else {
             print("Claude usage: no recent Claude Code sessions found")
         }

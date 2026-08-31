@@ -1,28 +1,49 @@
 import SwiftUI
 
-/// Detail view for Claude Code usage: both rate-limit windows, what has been
-/// spent in each, and when they reset.
+/// Detail view for Claude Code usage.
+///
+/// It reports what has been spent, not how close you are to the limit: the
+/// account's ceiling is not recorded anywhere locally, and the recorded rate
+/// limits do not agree on one — see ClaudeUsageMonitor. A percentage appears
+/// only when a budget has been set by hand.
 struct ClaudePanel: View {
     @ObservedObject var claude: ClaudeUsageMonitor
 
+    /// Refreshes itself every minute; the button forces it early.
+    private var status: String {
+        if claude.isScanning { return claude.snapshot == nil ? "reading transcripts…" : "refreshing…" }
+        guard let updated = claude.snapshot?.updatedAt else { return "" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return "updated " + formatter.string(from: updated)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
                 Text("CLAUDE CODE")
                     .font(.system(size: 8.5, weight: .semibold))
                     .tracking(0.8)
                     .foregroundStyle(.white.opacity(0.35))
                 Spacer()
-                if claude.isScanning && claude.snapshot == nil {
-                    Text("reading transcripts…")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.white.opacity(0.3))
-                }
+                Text(status)
+                    .font(.system(size: 9))
+                    .foregroundStyle(.white.opacity(0.3))
+                    .monospacedDigit()
+                IconButton(symbol: "arrow.clockwise", size: 9) { claude.refresh() }
+                    .disabled(claude.isScanning)
+                    .rotationEffect(.degrees(claude.isScanning ? 360 : 0))
+                    .animation(
+                        claude.isScanning
+                            ? .linear(duration: 1).repeatForever(autoreverses: false)
+                            : .default,
+                        value: claude.isScanning
+                    )
             }
 
             if let snapshot = claude.snapshot {
-                WindowRow(title: "5-hour window", window: snapshot.fiveHour)
-                WindowRow(title: "7-day window", window: snapshot.sevenDay)
+                WindowRow(title: "This 5-hour block", window: snapshot.fiveHour, showsClock: true)
+                WindowRow(title: "Last 7 days", window: snapshot.sevenDay, showsClock: false)
             } else {
                 Text("No Claude Code sessions in the last 30 days.")
                     .font(.system(size: 11))
@@ -39,37 +60,41 @@ struct ClaudePanel: View {
 private struct WindowRow: View {
     var title: String
     var window: ClaudeWindow
+    /// The five-hour block has a clock worth drawing; the rolling week doesn't.
+    var showsClock: Bool
 
     private var accent: Color {
-        if window.limitReached { return .red }
-        guard let percent = window.percent else { return .white.opacity(0.5) }
-        if percent > 0.85 { return Color(red: 1, green: 0.55, blue: 0.4) }
-        if percent > 0.6 { return Color(red: 1, green: 0.78, blue: 0.42) }
-        return Color(red: 0.85, green: 0.62, blue: 0.45)
+        window.limitReached ? .red : Color(red: 0.87, green: 0.64, blue: 0.46)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(title)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.white.opacity(0.75))
                 Spacer()
-                Text(window.limitReached ? "limit reached" : window.percentText)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                Text(window.tokensText)
+                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
                     .foregroundStyle(accent)
+                    .monospacedDigit()
+                Text(window.costText)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.white.opacity(0.35))
                     .monospacedDigit()
             }
 
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.12))
-                    Capsule()
-                        .fill(accent.opacity(0.9))
-                        .frame(width: max(3, geo.size.width * (window.percent ?? 0)))
+            if showsClock {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.white.opacity(0.12))
+                        Capsule()
+                            .fill(accent.opacity(0.75))
+                            .frame(width: max(3, geo.size.width * (window.percent ?? window.elapsedFraction)))
+                    }
                 }
+                .frame(height: 4)
             }
-            .frame(height: 4)
 
             Text(detail)
                 .font(.system(size: 9.5))
@@ -79,10 +104,14 @@ private struct WindowRow: View {
     }
 
     private var detail: String {
-        let used = window.limit == nil
-            ? "\(window.tokensText) tokens"
-            : "\(window.tokensText) of \(window.limitText) tokens"
-        guard window.resetsAt != nil else { return used }
-        return used + " · resets in " + window.remainingText
+        if window.limitReached {
+            return "rate limited · resets in " + window.remainingText
+        }
+        if let percent = window.percentText {
+            return "\(percent) of your budget · resets in " + window.remainingText
+        }
+        return showsClock
+            ? "block resets in " + window.remainingText
+            : "tokens sent, cache reads excluded"
     }
 }

@@ -117,8 +117,9 @@ struct MusicPanel: View {
     }
 }
 
-/// Compact five-hour usage, shown beside the transport. Tapping it opens the
-/// full Claude panel.
+/// Compact five-hour usage beside the transport. Leads with what has actually
+/// been spent; the bar is the window's clock, not a share of any limit, because
+/// no limit is knowable locally. Tapping it opens the full Claude panel.
 struct ClaudeUsageColumn: View {
     var snapshot: ClaudeUsageMonitor.Snapshot?
     var onTap: () -> Void
@@ -129,11 +130,7 @@ struct ClaudeUsageColumn: View {
 
     private var accent: Color {
         guard let window else { return .white.opacity(0.4) }
-        if window.limitReached { return .red }
-        guard let percent = window.percent else { return .white.opacity(0.55) }
-        if percent > 0.85 { return Color(red: 1, green: 0.55, blue: 0.4) }
-        if percent > 0.6 { return Color(red: 1, green: 0.78, blue: 0.42) }
-        return Color(red: 0.85, green: 0.62, blue: 0.45)
+        return window.limitReached ? .red : Color(red: 0.87, green: 0.64, blue: 0.46)
     }
 
     var body: some View {
@@ -144,7 +141,7 @@ struct ClaudeUsageColumn: View {
                 .foregroundStyle(.white.opacity(hovering ? 0.55 : 0.35))
 
             if let window {
-                Text(window.limitReached ? "limit" : window.percentText)
+                Text(window.limitReached ? "limit" : (window.percentText ?? window.tokensText))
                     .font(.system(size: 17, weight: .medium, design: .rounded))
                     .foregroundStyle(accent)
                     .monospacedDigit()
@@ -154,8 +151,8 @@ struct ClaudeUsageColumn: View {
                     ZStack(alignment: .leading) {
                         Capsule().fill(Color.white.opacity(0.14))
                         Capsule()
-                            .fill(accent.opacity(0.9))
-                            .frame(width: max(3, geo.size.width * (window.percent ?? 0)))
+                            .fill(accent.opacity(0.85))
+                            .frame(width: max(3, geo.size.width * (window.percent ?? window.elapsedFraction)))
                     }
                 }
                 .frame(height: 3)
@@ -177,6 +174,6 @@ struct ClaudeUsageColumn: View {
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture(perform: onTap)
-        .help("Claude Code usage — click for the weekly window too")
+        .help("Claude Code usage in this five-hour block — click for the week")
     }
 }
