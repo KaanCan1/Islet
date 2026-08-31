@@ -19,7 +19,16 @@ cp "$BIN_DIR/$APP_NAME" "$APP/Contents/MacOS/$APP_NAME"
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
-# Ad-hoc signature: without one, macOS re-asks for Automation permission constantly.
-codesign --force --sign - "$APP"
+# A stable signing identity keeps macOS treating each build as the same app, so
+# keychain and Automation grants survive a rebuild. Ad-hoc signatures are derived
+# from the code hash, so every build looks like a different program and every
+# permission is asked again. Falls back to ad-hoc when no identity is set up.
+IDENTITY="${ISLET_SIGN_IDENTITY:-Islet Dev}"
+if security find-identity -v -p codesigning 2>/dev/null | grep -q "$IDENTITY"; then
+	echo "==> Signing as $IDENTITY"
+	codesign --force --sign "$IDENTITY" "$APP"
+else
+	codesign --force --sign - "$APP"
+fi
 
 echo "==> Done: $APP"
