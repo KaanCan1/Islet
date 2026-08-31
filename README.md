@@ -3,6 +3,8 @@
 Hover your MacBook's camera notch and it grows into a panel. Move away and it
 disappears completely.
 
+![Islet in action](docs/demo.gif)
+
 <img src="docs/music.png" width="470" alt="Music panel">
 <img src="docs/timer.png" width="470" alt="Timer panel">
 
