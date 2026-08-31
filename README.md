@@ -40,56 +40,59 @@ to try it without installing.
 
 ## Permissions
 
-On first launch macOS asks for **Automation** ("Islet wants to control Spotify") —
-the music panel needs it. **Accessibility** is only requested if you use the
-transport buttons while something other than Spotify or Music is playing. Battery
-readings need no permission.
+macOS asks for these the first time each is needed. Everything Islet reads stays
+on the machine; the only network request it ever makes is to Anthropic, for your
+own usage figures.
 
-Islet also asks once, itself, before reading anything under `~/.claude`. macOS
-does not gate that directory, so nothing would stop an app reading it silently;
-answering "Not now" leaves the feature off and nothing is read.
+| Prompt | What for | Needed? |
+|---|---|---|
+| **Automation** — "Islet wants to control Spotify" | Reading the current track and driving the transport | Yes, for the music panel |
+| **Keychain** — "Islet wants to access Claude Code-credentials" | The OAuth token, to ask Claude for your real usage percentages | Only for exact Claude figures; declining falls back to a local estimate |
+| **Accessibility** | Emulating the media keys when something other than Spotify or Music is playing | No, only if you use the transport buttons in that case |
+
+Islet also asks once, itself, before reading anything under `~/.claude` — macOS
+does not gate that directory, so nothing would otherwise stop an app reading it
+quietly. Answer "Not now" and none of it is touched.
 
 ## Notes
 
 - Now playing comes from AppleScript, not private APIs: macOS 15.4 closed
   `MediaRemote` to unentitled apps.
-- The Claude figures come from `~/.claude/projects/*.jsonl`, read locally — only
-  timestamps, token counts and model names, never message content, and nothing
-  leaves the machine. Islet asks before it reads any of it, and the whole thing
-  stays hidden if you have never used Claude Code.
-- **The real figures come from Claude's own usage endpoint** when it can be
-  reached: `GET /api/oauth/usage` on api.anthropic.com, the same one `/usage`
-  reads, which answers with the actual utilisation and reset time. It needs the
-  OAuth token the `claude` CLI writes to the login keychain. If you only ever run
-  Claude Code from the desktop app there is no such token — that install keeps its
-  session in the app's own encrypted storage — and Islet falls back to estimating
-  from transcripts. Log in once with the CLI and it switches over on its own.
-- **The estimate measures time, not tokens.** Nothing on disk says what Claude
-  counts, so it was worked out from the moments this account was cut off: across
-  those, the tokens standing in the window varied by 3.5x (1.2M to 4.3M) while
-  the minutes spent varied far less. Against a figure read out of `/usage`, the
-  time measure predicted 72% where the truth was 77%; tokens were out by up to 2x.
-- **The estimated ceiling is learned, not configured**: the largest usage standing
-  in a window when Claude Code cut you off. Run past it without being cut off and
-  it moves up, so a plan change works its way in on its own. Two rejections are
-  required before any percentage appears — the single seven-day rejection here
-  predated a "+50% weekly limits" promo and would have claimed 99% against a real
-  33%. Expect roughly a quarter of spread while estimating; the endpoint above is
-  the only exact source.
-- Reset times land on ten-minute boundaries, and a recorded rejection carries the
-  server's own. Both are used, which took the average error against known resets
-  from 6.2 minutes to 5.0.
-- Scanning is incremental: only bytes appended since the last pass are
-  read, so just the first scan is slow (about 12 seconds for 380 MB of
-  transcripts, on a background thread). It refreshes every minute and the panel
-  has a refresh button.
+- **Claude figures are the real ones** when the token is reachable: Islet reads
+  `GET /api/oauth/usage` on api.anthropic.com, the same endpoint `/usage` reads,
+  and the panel says so. The token is the one the `claude` CLI writes to the login
+  keychain — a desktop-app-only install doesn't have it, so log in once with the
+  CLI and Islet switches over on its own.
+- Without it, usage is **estimated** from `~/.claude/projects/*.jsonl` — timestamps
+  and token counts only, never message content. Expect roughly a quarter of
+  spread: nothing on disk states the account's limits, so the ceiling is inferred
+  from the moments Claude actually cut you off, and those disagree with each other
+  by up to 3.5x. The panel labels which of the two you are looking at.
+- Scanning is incremental, so only the first pass is slow — about 12 seconds for
+  380 MB of transcripts, on a background thread. It refreshes every minute, and
+  the panel has a refresh button.
+- The Claude column and its tab disappear entirely if you don't use Claude Code.
 - Displays without a notch get a virtual one at the top centre of the screen.
-- In full-screen apps macOS slides the menu bar down the moment the cursor
-  touches the top edge. That's the system, not Islet. To stop it: System Settings
-  → Control Center → Menu Bar → "Automatically hide and show the menu bar" → Never.
+- In full-screen apps macOS slides the menu bar down the moment the cursor touches
+  the top edge. That's the system, not Islet. To stop it: System Settings → Control
+  Center → Menu Bar → "Automatically hide and show the menu bar" → Never.
 - `./dist/Islet.app/Contents/MacOS/Islet --diagnose` prints every screen, the
-  detected notch size, permission state and the raw now-playing payload.
+  detected notch size, permission state, and where the Claude figures came from.
 
-## License
+## License and notices
 
-MIT — see [LICENSE](LICENSE).
+The code is MIT licensed — see [LICENSE](LICENSE). Do what you like with it.
+
+Islet is an independent personal project. It is **not affiliated with, endorsed
+by, or sponsored by Anthropic, Spotify, or Apple**. Those names, and Claude,
+Claude Code, Spotify and Apple Music, are trademarks of their respective owners
+and appear here only to say what the app talks to.
+
+Islet displays nothing of its own beyond its interface. Album artwork, track and
+artist names come from whichever player you are running and belong to their
+rights holders; the app shows them the way any music player shows them, and keeps
+no copy beyond a temporary file for the current track. The artwork visible in the
+screenshots and the demo recording is incidental for the same reason.
+
+Usage figures are read from your own Claude account, with your own credentials, on
+your own machine. Islet sends nothing anywhere else and stores no telemetry.
