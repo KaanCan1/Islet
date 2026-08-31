@@ -19,15 +19,17 @@ While something is playing, a small summary sits beside the notch:
 
 ## Install
 
-Needs macOS 14+ and Xcode or the Command Line Tools.
+Needs macOS 14+ and the Xcode Command Line Tools.
 
 ```bash
+git clone https://github.com/KaanCan1/Islet.git
+cd Islet
 make install
 ```
 
-That builds `dist/Islet.app`, copies it to `/Applications` and launches it. Use
-`make run` to build and run it in place instead. Islet lives in the menu bar with
-no Dock icon, and every setting is in that menu.
+That's it — the app is built, copied to `/Applications` and launched. It lives in
+the menu bar with no Dock icon, and every setting is in that menu. Use `make run`
+to try it without installing.
 
 ## Permissions
 
