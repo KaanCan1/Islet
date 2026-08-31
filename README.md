@@ -8,10 +8,12 @@ disappears completely.
 <img src="docs/music.png" width="470" alt="Music panel">
 <img src="docs/timer.png" width="470" alt="Timer panel">
 
-**Music** — now playing from Spotify or Apple Music, with artwork, a scrubbable
+**Music** — now playing from Spotify or Apple Music: large artwork, a scrubbable
 progress bar and transport controls. Click the artwork to jump to the app it's
-playing in. **Timer** — a pomodoro with Focus and Break modes. Plus battery
-alerts when the charger goes in or out, and an option to stay on the lock screen.
+playing in. **Claude** — how much of the current Claude Code five-hour usage
+window is left, next to it. **Timer** — a pomodoro with Focus and Break modes.
+Plus battery alerts when the charger goes in or out, and an option to stay on
+the lock screen.
 
 While something is playing, a small summary sits beside the notch:
 
@@ -42,6 +44,10 @@ readings need no permission.
 
 - Now playing comes from AppleScript, not private APIs: macOS 15.4 closed
   `MediaRemote` to unentitled apps.
+- The Claude column reads `~/.claude/projects/*.jsonl` locally — only timestamps
+  and token counts, never message content, and nothing leaves the machine. There
+  is no live quota figure on disk, so the five-hour window is reconstructed from
+  those timestamps. Turn the column off from the menu bar item.
 - Displays without a notch get a virtual one at the top centre of the screen.
 - In full-screen apps macOS slides the menu bar down the moment the cursor
   touches the top edge. That's the system, not Islet. To stop it: System Settings

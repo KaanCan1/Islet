@@ -3,38 +3,53 @@ import SwiftUI
 struct MusicPanel: View {
     @ObservedObject var music: MusicManager
     @ObservedObject var state: NotchState
+    @ObservedObject var claude: ClaudeUsageMonitor
 
-    @State private var headerHovering = false
+    @State private var artworkHovering = false
 
     private var track: TrackInfo { music.track }
     private var hasTrack: Bool { !track.isEmpty }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            header
-            if hasTrack {
-                progress
-            } else {
-                Text(music.anyPlayerRunning
-                     ? "Start playing something"
-                     : "Open Spotify or Music — or use the media keys")
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.white.opacity(0.45))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .frame(height: 16)
+        HStack(spacing: 12) {
+            artwork
+            transport
+            if state.prefs.showClaudeUsage {
+                Rectangle()
+                    .fill(Color.white.opacity(0.08))
+                    .frame(width: 1, height: 58)
+                ClaudeUsageColumn(snapshot: claude.snapshot)
+                    .frame(width: 92)
             }
-            controls
         }
-        .padding(.horizontal, 13)
-        .padding(.top, 4)
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
         .padding(.bottom, 10)
     }
 
-    /// Tapping the header brings the playing app to the front.
-    private var header: some View {
-        HStack(spacing: 9) {
-            ArtworkView(image: music.artwork, size: 46, corner: 9)
-            VStack(alignment: .leading, spacing: 1) {
+    /// Tapping the artwork brings the playing app to the front.
+    private var artwork: some View {
+        ArtworkView(image: music.artwork, size: 78, corner: 12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.black.opacity(artworkHovering && hasTrack ? 0.25 : 0))
+            )
+            .overlay(
+                Image(systemName: "arrow.up.forward")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .opacity(artworkHovering && hasTrack ? 0.9 : 0)
+            )
+            .animation(.easeOut(duration: 0.15), value: artworkHovering)
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .onHover { artworkHovering = $0 }
+            .onTapGesture { music.activateSource() }
+            .help(hasTrack ? "Open in \(track.source.displayName)" : "")
+    }
+
+    private var transport: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 8) {
                 if hasTrack {
                     MarqueeText(text: track.title, size: 13, weight: .semibold)
                 } else {
@@ -43,28 +58,32 @@ struct MusicPanel: View {
                         .foregroundStyle(.white)
                         .frame(height: 18, alignment: .leading)
                 }
-                Text(hasTrack ? track.artist : track.source.displayName)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.55))
-                    .lineLimit(1)
+                Equalizer(active: track.isPlaying, height: 12)
             }
-            Spacer(minLength: 6)
-            Equalizer(active: track.isPlaying, height: 14)
+
+            Text(hasTrack ? track.artist : subtitle)
+                .font(.system(size: 10.5))
+                .foregroundStyle(.white.opacity(0.5))
+                .lineLimit(1)
+
+            Spacer(minLength: 0)
+
+            if hasTrack { progress }
+            controls
         }
-        .frame(height: 46)
-        .opacity(headerHovering && hasTrack ? 0.75 : 1)
-        .contentShape(Rectangle())
-        .onHover { headerHovering = $0 }
-        .onTapGesture { music.activateSource() }
-        .help(hasTrack ? "Open in \(track.source.displayName)" : "")
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: 78)
+    }
+
+    private var subtitle: String {
+        music.anyPlayerRunning ? "Start playing something" : "Open Spotify or Music"
     }
 
     private var progress: some View {
         HStack(spacing: 7) {
             Text(music.position.clockString)
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(.system(size: 9.5, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(0.5))
-                .frame(width: 32, alignment: .leading)
                 .monospacedDigit()
 
             SeekBar(
@@ -74,27 +93,81 @@ struct MusicPanel: View {
             )
 
             Text("-" + max(0, track.duration - music.position).clockString)
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(.system(size: 9.5, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(0.5))
-                .frame(width: 36, alignment: .trailing)
                 .monospacedDigit()
         }
-        .frame(height: 16)
+        .frame(height: 14)
     }
 
     private var controls: some View {
         HStack(spacing: 0) {
-            IconButton(symbol: "shuffle", size: 12, isOn: track.shuffle) { music.toggleShuffle() }
+            IconButton(symbol: "shuffle", size: 11, isOn: track.shuffle) { music.toggleShuffle() }
                 .disabled(!hasTrack)
             Spacer(minLength: 0)
-            IconButton(symbol: "backward.fill", size: 15) { music.previous() }
-            IconButton(symbol: track.isPlaying ? "pause.fill" : "play.fill", size: 19) { music.playPause() }
-                .padding(.horizontal, 6)
-            IconButton(symbol: "forward.fill", size: 15) { music.next() }
+            IconButton(symbol: "backward.fill", size: 14) { music.previous() }
+            IconButton(symbol: track.isPlaying ? "pause.fill" : "play.fill", size: 18) { music.playPause() }
+                .padding(.horizontal, 4)
+            IconButton(symbol: "forward.fill", size: 14) { music.next() }
             Spacer(minLength: 0)
-            IconButton(symbol: "repeat", size: 12, isOn: track.repeatOn) { music.toggleRepeat() }
+            IconButton(symbol: "repeat", size: 11, isOn: track.repeatOn) { music.toggleRepeat() }
                 .disabled(!hasTrack)
         }
-        .frame(height: 32)
+        .frame(height: 30)
+    }
+}
+
+/// How much of Claude Code's five-hour window is left, read from its own
+/// transcripts. See ClaudeUsageMonitor for where the numbers come from.
+struct ClaudeUsageColumn: View {
+    var snapshot: ClaudeUsageMonitor.Snapshot?
+
+    private var accent: Color {
+        guard let snapshot else { return .white.opacity(0.4) }
+        if snapshot.limitReached { return .red }
+        return snapshot.windowProgress > 0.85
+            ? Color(red: 1, green: 0.72, blue: 0.35)
+            : Color(red: 0.85, green: 0.6, blue: 0.45)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("CLAUDE")
+                .font(.system(size: 8.5, weight: .semibold))
+                .tracking(0.8)
+                .foregroundStyle(.white.opacity(0.35))
+
+            if let snapshot {
+                Text(snapshot.limitReached ? "limit" : snapshot.remainingText)
+                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                    .foregroundStyle(accent)
+                    .monospacedDigit()
+                    .lineLimit(1)
+
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.white.opacity(0.14))
+                        Capsule()
+                            .fill(accent.opacity(0.9))
+                            .frame(width: max(3, geo.size.width * snapshot.windowProgress))
+                    }
+                }
+                .frame(height: 3)
+
+                Text("\(snapshot.tokenText) tokens")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.4))
+                    .lineLimit(1)
+            } else {
+                Text("—")
+                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.3))
+                Text("no session")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.3))
+            }
+        }
+        .frame(maxHeight: .infinity, alignment: .center)
+        .help("Time left in the current Claude Code usage window")
     }
 }

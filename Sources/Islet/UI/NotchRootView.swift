@@ -58,7 +58,7 @@ struct NotchRootView: View {
         } else if state.isExpanded {
             Group {
                 switch state.tab {
-                case .music: MusicPanel(music: music, state: state)
+                case .music: MusicPanel(music: music, state: state, claude: state.claude)
                 case .timer: TimerPanel(pomodoro: pomodoro, state: state)
                 }
             }

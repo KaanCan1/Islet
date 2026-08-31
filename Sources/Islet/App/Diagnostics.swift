@@ -34,6 +34,13 @@ enum Diagnostics {
             print("Battery: no power source reported (desktop Mac?)")
         }
 
+        if let usage = ClaudeUsageMonitor.probe() {
+            print("Claude window: \(usage.tokenText) tokens, resets in \(usage.remainingText)"
+                  + (usage.limitReached ? " (limit reached)" : ""))
+        } else {
+            print("Claude window: no recent Claude Code sessions found")
+        }
+
         // Debug hook: ISLET_SCRIPT runs any AppleScript under the app's own
         // identity, which is the quickest way to test player scripts.
         if let custom = ProcessInfo.processInfo.environment["ISLET_SCRIPT"] {

@@ -30,6 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
 
         addToggle(to: menu, title: "Peek beside the notch", id: "peek", action: #selector(togglePeek))
+        addToggle(to: menu, title: "Claude usage in the music panel", id: "claude", action: #selector(toggleClaude))
         addToggle(to: menu, title: "Show on lock screen", id: "lock", action: #selector(toggleLockScreen))
         addToggle(to: menu, title: "Battery and charging alerts", id: "battery", action: #selector(toggleBattery))
         addToggle(to: menu, title: "Timer chime", id: "chime", action: #selector(toggleChime))
@@ -53,6 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func openTimer() { controller.open(tab: .timer) }
     @objc private func togglePeek() { Preferences.shared.showPeek.toggle() }
     @objc private func toggleChime() { Preferences.shared.chimeEnabled.toggle() }
+    @objc private func toggleClaude() { Preferences.shared.showClaudeUsage.toggle() }
     @objc private func toggleBattery() { Preferences.shared.showBatteryAlerts.toggle() }
 
     @objc private func toggleLockScreen() {
@@ -78,6 +80,7 @@ extension AppDelegate: NSMenuDelegate {
             switch item.identifier?.rawValue {
             case "peek": item.state = prefs.showPeek ? .on : .off
             case "lock": item.state = prefs.showOnLockScreen ? .on : .off
+            case "claude": item.state = prefs.showClaudeUsage ? .on : .off
             case "battery": item.state = prefs.showBatteryAlerts ? .on : .off
             case "chime": item.state = prefs.chimeEnabled ? .on : .off
             case "login": item.state = prefs.launchAtLogin ? .on : .off

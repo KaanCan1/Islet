@@ -12,11 +12,11 @@ enum Layout {
     static let peek: CGFloat = 66
 
     /// Body width when expanded, shoulders excluded.
-    static let contentWidth: CGFloat = 376
+    static let contentWidth: CGFloat = 440
 
     /// Note: these heights do NOT include the notch strip. They describe the
     /// content area below the physical notch; the total is worked out in NotchState.
-    static let musicHeight: CGFloat = 122
+    static let musicHeight: CGFloat = 100
     static let timerHeight: CGFloat = 108
 
     /// Height of a transient alert (battery) below the notch strip.
@@ -27,7 +27,7 @@ enum Layout {
 
     /// The window itself never changes size. Expanding animates the SwiftUI body
     /// inside it instead, which avoids clipping and resize jitter.
-    static let windowWidth: CGFloat = 520
+    static let windowWidth: CGFloat = 620
     static let windowHeight: CGFloat = 250
 
     /// How far the cursor may stray before the panel collapses again.

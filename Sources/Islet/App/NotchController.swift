@@ -53,6 +53,7 @@ final class NotchController {
             ))
         }
         battery.start()
+        state.claude.start()
     }
 
     // MARK: - Window

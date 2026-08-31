@@ -23,6 +23,7 @@ final class NotchState: ObservableObject {
 
     let music = MusicManager()
     let pomodoro = PomodoroTimer()
+    let claude = ClaudeUsageMonitor()
     let prefs = Preferences.shared
 
     var metrics: NotchMetrics?
@@ -30,7 +31,8 @@ final class NotchState: ObservableObject {
 
     init() {
         // Changes in the child objects affect the peek width, so forward them up.
-        for publisher in [music.objectWillChange, pomodoro.objectWillChange, prefs.objectWillChange] {
+        for publisher in [music.objectWillChange, pomodoro.objectWillChange,
+                          claude.objectWillChange, prefs.objectWillChange] {
             publisher.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &bag)
         }
         // When the timer finishes, open the panel on the Timer tab.
