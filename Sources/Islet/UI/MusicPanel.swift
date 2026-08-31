@@ -5,7 +5,13 @@ struct MusicPanel: View {
     @ObservedObject var state: NotchState
     @ObservedObject var claude: ClaudeUsageMonitor
 
+    /// Artwork and title are one target: hovering either dims both, so it reads
+    /// as a single thing to click rather than two. Tracked separately so that
+    /// sliding from one to the other cannot leave the exit cancelling the enter.
     @State private var artworkHovering = false
+    @State private var titleHovering = false
+
+    private var sourceHovering: Bool { artworkHovering || titleHovering }
 
     private var track: TrackInfo { music.track }
     private var hasTrack: Bool { !track.isEmpty }
@@ -30,41 +36,38 @@ struct MusicPanel: View {
     /// Tapping the artwork brings the playing app to the front.
     private var artwork: some View {
         ArtworkView(image: music.artwork, size: 78, corner: 12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.black.opacity(artworkHovering && hasTrack ? 0.25 : 0))
-            )
-            .overlay(
-                Image(systemName: "arrow.up.forward")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .opacity(artworkHovering && hasTrack ? 0.9 : 0)
-            )
-            .animation(.easeOut(duration: 0.15), value: artworkHovering)
-            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .onHover { artworkHovering = $0 }
-            .onTapGesture { music.activateSource() }
+            .modifier(SourceLink(dimmed: sourceHovering, enabled: hasTrack,
+                                 onHover: { artworkHovering = $0 }) {
+                music.activateSource()
+            })
             .help(hasTrack ? "Open in \(track.source.displayName)" : "")
     }
 
     private var transport: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 8) {
-                if hasTrack {
-                    MarqueeText(text: track.title, size: 13, weight: .semibold)
-                } else {
-                    Text("Nothing playing")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(height: 18, alignment: .leading)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 8) {
+                    if hasTrack {
+                        MarqueeText(text: track.title, size: 13, weight: .semibold)
+                    } else {
+                        Text("Nothing playing")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(height: 18, alignment: .leading)
+                    }
+                    Equalizer(active: track.isPlaying, height: 12)
                 }
-                Equalizer(active: track.isPlaying, height: 12)
-            }
 
-            Text(hasTrack ? track.artist : subtitle)
-                .font(.system(size: 10.5))
-                .foregroundStyle(.white.opacity(0.5))
-                .lineLimit(1)
+                Text(hasTrack ? track.artist : subtitle)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .lineLimit(1)
+            }
+            .modifier(SourceLink(dimmed: sourceHovering, enabled: hasTrack,
+                                 onHover: { titleHovering = $0 }) {
+                music.activateSource()
+            })
+            .help(hasTrack ? "Open in \(track.source.displayName)" : "")
 
             Spacer(minLength: 0)
 
@@ -114,6 +117,24 @@ struct MusicPanel: View {
                 .disabled(!hasTrack)
         }
         .frame(height: 30)
+    }
+}
+
+/// Opens the playing app on click, and fades on hover to say so. No icon overlay:
+/// the whole header is the target, and a badge on one half of it read as clutter.
+private struct SourceLink: ViewModifier {
+    var dimmed: Bool
+    var enabled: Bool
+    var onHover: (Bool) -> Void
+    var action: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(dimmed && enabled ? 0.6 : 1)
+            .animation(.easeOut(duration: 0.14), value: dimmed)
+            .contentShape(Rectangle())
+            .onHover { onHover($0 && enabled) }
+            .onTapGesture(perform: action)
     }
 }
 
