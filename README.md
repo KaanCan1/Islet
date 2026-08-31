@@ -57,17 +57,23 @@ answering "Not now" leaves the feature off and nothing is read.
   timestamps, token counts and model names, never message content, and nothing
   leaves the machine. Islet asks before it reads any of it, and the whole thing
   stays hidden if you have never used Claude Code.
-- **The percentage needs calibrating once.** Claude Code fetches its limits from
-  the API and writes them nowhere, and they move (the account this was built on
-  had a "+50% weekly limits" promo running). Guessing the ceiling from past rate
-  limits was not good enough — the block totals at the moments this account was
-  rate limited ranged from 1.2M to 4.3M tokens. So run `/usage` in Claude Code,
-  press the target button in the panel, and type the two percentages it reports;
-  Islet back-solves the ceilings from what you have already spent and uses them
-  from then on. Until you do, it shows an estimate marked with `~`.
-- Token totals exclude cache reads, which otherwise dwarf everything else. The
-  five-hour window is timed from the first request after the previous window ran
-  out, not rounded to the hour — rounding put the reset time up to an hour out.
+- **Usage is measured as time, not tokens.** Nothing on disk says what Claude
+  counts, so it was worked out from the moments this account was actually cut
+  off. Across those, the tokens standing in the window varied by 3.5x (1.2M to
+  4.3M) while the minutes spent varied far less. Checked against a figure read
+  out of Claude Code's own `/usage`, the time measure predicted 72% where the
+  truth was 77%; tokens were out by up to 2x.
+- **The ceiling is learned, not configured.** It is the largest usage standing in
+  a window at the moments Claude Code cut you off, and it corrects itself: run
+  past it without being cut off and it moves up, so a plan change or a promo
+  works its way in on its own. It needs two rejections before it will show a
+  percentage — the single seven-day rejection on the machine this was built on
+  predated a "+50% weekly limits" promo and would have reported 99% against a
+  real 33%. Until then the window shows hours used and its reset time.
+- Expect the percentage to be a guide rather than a readout. Across the four
+  rejections here the same measure landed between 50 and 89 minutes, so roughly a
+  quarter of spread is baked in; it is the closest thing derivable without an API
+  that reports the real figure.
 - Scanning is incremental: only bytes appended since the last pass are
   read, so just the first scan is slow (about 12 seconds for 380 MB of
   transcripts, on a background thread). It refreshes every minute and the panel

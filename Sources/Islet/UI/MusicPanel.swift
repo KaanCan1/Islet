@@ -166,7 +166,7 @@ struct ClaudeUsageColumn: View {
                 .foregroundStyle(.white.opacity(hovering ? 0.55 : 0.35))
 
             if let window {
-                Text(window.limitReached ? "limit" : (window.percentText ?? window.tokensText))
+                Text(window.limitReached ? "limit" : (window.percentText ?? window.usageText))
                     .font(.system(size: 17, weight: .medium, design: .rounded))
                     .foregroundStyle(accent)
                     .monospacedDigit()

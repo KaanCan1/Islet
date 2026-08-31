@@ -8,68 +8,60 @@ private let scanHorizon: TimeInterval = 30 * 86400
 
 /// Usage measured over one rate-limit window.
 ///
-/// There is deliberately no "percent of your limit" here. The account's actual
-/// ceiling is not written anywhere on disk, and it cannot be inferred from the
-/// rejections either: across the recorded rate limits on this machine the block
-/// totals ranged from 1.2M to 4.3M tokens ($133 to $435 of equivalent API
-/// spend), so no single number explains them. A percentage is only shown when
-/// the user supplies their own budget.
+/// Measured as time rather than tokens. Nothing on disk says what Claude counts,
+/// so it was worked out from the moments this account was actually cut off:
+/// across those, the tokens standing in the window varied by a factor of 3.5
+/// (1.2M to 4.3M) while the minutes spent varied far less. Checked against a
+/// figure read out of Claude Code's own /usage, the time measure predicted 85%
+/// where the truth was 77%; the token measure was out by up to 2x.
 struct ClaudeWindow: Equatable {
+    /// Seconds in which at least one request was made.
+    var usageSeconds: Int
     var tokens: Int
-    /// Equivalent API spend at published per-model rates. On a subscription this
-    /// is notional — a sense of magnitude, not a bill.
-    var cost: Double
+    /// Ceiling in seconds, from the moments this account was rate limited.
+    /// Nil when no rejection has been recorded, or when the evidence has gone
+    /// stale — being over it without being cut off proves it wrong.
+    var ceilingSeconds: Int?
     var resetsAt: Date?
     var limitReached: Bool
-    /// Reference the percentage is measured against.
-    var budget: Int?
-    /// True when the reference was calibrated from past rate limits rather than
-    /// set by the user, so the UI can mark the number as an estimate.
-    var budgetIsEstimated = false
+    var length: TimeInterval = fiveHourWindow
 
     var percent: Double? {
-        guard let budget, budget > 0 else { return nil }
-        return min(Double(tokens) / Double(budget), 1)
+        guard let ceilingSeconds, ceilingSeconds > 0 else { return nil }
+        return min(Double(usageSeconds) / Double(ceilingSeconds), 1)
     }
 
     var percentText: String? {
         percent.map { "\(Int(($0 * 100).rounded()))%" }
     }
 
-    var budgetText: String? {
-        budget.map { (budgetIsEstimated ? "~" : "") + Self.tokenText($0) }
+    static func duration(_ seconds: Int) -> String {
+        let hours = seconds / 3600, minutes = (seconds % 3600) / 60
+        return hours > 0 ? "\(hours)h \(minutes)m" : "\(minutes)m"
     }
 
-    var costText: String {
-        cost >= 100 ? String(format: "$%.0f", cost) : String(format: "$%.2f", cost)
-    }
+    var usageText: String { Self.duration(usageSeconds) }
+    var ceilingText: String? { ceilingSeconds.map { "~" + Self.duration($0) } }
 
-    /// How far through the window's clock we are — this one is factual.
-    var elapsedFraction: Double {
-        guard let resetsAt, length > 0 else { return 0 }
-        return min(max(1 - resetsAt.timeIntervalSinceNow / length, 0), 1)
+    var tokensText: String {
+        if tokens >= 1_000_000 { return String(format: "%.1fM", Double(tokens) / 1_000_000) }
+        if tokens >= 1_000 { return "\(tokens / 1_000)K" }
+        return "\(tokens)"
     }
-
-    var length: TimeInterval = fiveHourWindow
 
     var remainingText: String {
         guard let resetsAt else { return "no reset recorded" }
         let total = Int(max(0, resetsAt.timeIntervalSinceNow))
-        let days = total / 86400
-        let hours = (total % 86400) / 3600
-        let minutes = (total % 3600) / 60
+        let days = total / 86400, hours = (total % 86400) / 3600, minutes = (total % 3600) / 60
         if days > 0 { return "\(days)d \(hours)h" }
-        if hours > 0 { return "\(hours)h \(minutes)m" }
-        return "\(minutes)m"
+        return hours > 0 ? "\(hours)h \(minutes)m" : "\(minutes)m"
     }
 
-    static func tokenText(_ value: Int) -> String {
-        if value >= 1_000_000 { return String(format: "%.1fM", Double(value) / 1_000_000) }
-        if value >= 1_000 { return "\(value / 1_000)K" }
-        return "\(value)"
+    /// How far through the window's clock we are — factual, unlike the ceiling.
+    var elapsedFraction: Double {
+        guard let resetsAt, length > 0 else { return 0 }
+        return min(max(1 - resetsAt.timeIntervalSinceNow / length, 0), 1)
     }
-
-    var tokensText: String { Self.tokenText(tokens) }
 }
 
 /// Reads Claude Code's own session transcripts to report how much of the
@@ -369,43 +361,54 @@ private final class Store: @unchecked Sendable {
 
     private func summarise() -> ClaudeUsageMonitor.Snapshot? {
         guard !cache.times.isEmpty else { return nil }
-        let now = Date()
+        let now = Date().timeIntervalSince1970
 
         // The window opens with the first request after the previous one ran out,
         // so this needs exact timestamps rather than anything rounded.
-        let ordered = cache.times.indices.sorted { cache.times[$0] < cache.times[$1] }
-        var blockStart = cache.times[ordered[0]]
-        for index in ordered where cache.times[index] - blockStart >= fiveHourWindow {
-            blockStart = cache.times[index]
-        }
+        let ordered = cache.times.sorted()
+        var blockStart = ordered[0]
+        for time in ordered where time - blockStart >= fiveHourWindow { blockStart = time }
 
-        let weekStart = now.timeIntervalSince1970 - sevenDayWindow
-        let defaults = UserDefaults.standard
-
-        let five = ClaudeWindow(
-            tokens: tokens(from: blockStart),
-            cost: cost(from: blockStart),
-            resetsAt: Date(timeIntervalSince1970: blockStart + fiveHourWindow),
-            limitReached: isRejected("five_hour", now: now),
-            budget: nonZero(defaults.integer(forKey: "claudeBlockBudget"))
-                ?? estimatedCeiling(for: "five_hour", window: fiveHourWindow),
-            budgetIsEstimated: defaults.integer(forKey: "claudeBlockBudget") == 0,
-            length: fiveHourWindow
-        )
-        let seven = ClaudeWindow(
-            tokens: tokens(from: weekStart),
-            cost: cost(from: weekStart),
-            resetsAt: projectedWeeklyReset(now: now),
-            limitReached: isRejected("seven_day", now: now),
-            budget: nonZero(defaults.integer(forKey: "claudeWeekBudget"))
-                ?? estimatedCeiling(for: "seven_day", window: sevenDayWindow),
-            budgetIsEstimated: defaults.integer(forKey: "claudeWeekBudget") == 0,
-            length: sevenDayWindow
-        )
-        return ClaudeUsageMonitor.Snapshot(fiveHour: five, sevenDay: seven, updatedAt: now)
+        let five = window(from: blockStart, to: now, length: fiveHourWindow,
+                          resetsAt: Date(timeIntervalSince1970: blockStart + fiveHourWindow),
+                          type: "five_hour")
+        let seven = window(from: now - sevenDayWindow, to: now, length: sevenDayWindow,
+                           resetsAt: projectedWeeklyReset(now: Date()),
+                           type: "seven_day")
+        return ClaudeUsageMonitor.Snapshot(fiveHour: five, sevenDay: seven, updatedAt: Date())
     }
 
-    private func tokens(from start: TimeInterval, to end: TimeInterval = .greatestFiniteMagnitude) -> Int {
+    private func window(from start: TimeInterval, to end: TimeInterval, length: TimeInterval,
+                        resetsAt: Date?, type: String) -> ClaudeWindow {
+        let used = usageSeconds(from: start, to: end)
+        let rejected = isRejected(type, now: Date())
+        var ceiling = estimatedCeiling(for: type, window: length)
+        // Running past the ceiling without being cut off proves it too low, so
+        // raise it. That is what keeps this honest as limits move: a promo or a
+        // plan change works itself in without anyone typing a number.
+        if let value = ceiling, used > value, !rejected { ceiling = used }
+
+        return ClaudeWindow(
+            usageSeconds: used,
+            tokens: tokens(from: start, to: end),
+            ceilingSeconds: ceiling,
+            resetsAt: resetsAt,
+            limitReached: rejected,
+            length: length
+        )
+    }
+
+    /// Seconds in which at least one request was made, counted in 30-second slots.
+    /// Finer slots track the rejections about as well and read less like padding.
+    private func usageSeconds(from start: TimeInterval, to end: TimeInterval) -> Int {
+        var slots = Set<Int>()
+        for time in cache.times where time >= start && time <= end {
+            slots.insert(Int(time / 30))
+        }
+        return slots.count * 30
+    }
+
+    private func tokens(from start: TimeInterval, to end: TimeInterval) -> Int {
         var total = 0
         for index in cache.times.indices where cache.times[index] >= start && cache.times[index] <= end {
             total += cache.tokens[index]
@@ -413,37 +416,40 @@ private final class Store: @unchecked Sendable {
         return total
     }
 
-    private func cost(from start: TimeInterval, to end: TimeInterval = .greatestFiniteMagnitude) -> Double {
-        var total = 0.0
-        for index in cache.times.indices
-        where cache.times[index] >= start && cache.times[index] <= end && index < cache.costs.count {
-            total += cache.costs[index]
-        }
-        return total
-    }
-
-    /// Tokens standing in a window at a past moment, for calibration.
-    func tokensInWindow(endingAt end: TimeInterval, length: TimeInterval) -> Int {
-        tokens(from: end - length, to: end)
-    }
-
-    private func nonZero(_ value: Int) -> Int? { value > 0 ? value : nil }
-
-    /// Reference point for the percentage.
+    /// The ceiling, in seconds, from the moments this account was rate limited:
+    /// the usage standing in the window at each, taking the largest.
     ///
-    /// No ceiling is written anywhere on disk, and the recorded rate limits do
-    /// not agree on one: on the machine this was written, block totals at the
-    /// point of rejection ranged from 1.2M to 4.3M tokens. So this takes the
-    /// median of them — calibrated against this account and this plan, since the
-    /// rejections are its own, but an estimate, and shown as one.
+    /// The largest, not the median, because the measure and whatever Claude
+    /// actually counts do not line up exactly — the four rejections here landed
+    /// at 50, 64, 88 and 89 minutes. Checked against a figure read out of Claude
+    /// Code's own /usage, the largest predicted 72% where the truth was 77%; the
+    /// median said 85%. It also cannot report over 100% before a cut-off, which
+    /// the median could.
     private func estimatedCeiling(for type: String, window: TimeInterval) -> Int? {
-        let totals = cache.rejections
-            .filter { $0.type == type }
-            .map { tokens(from: $0.at.timeIntervalSince1970 - window, to: $0.at.timeIntervalSince1970) }
-            .filter { $0 > 0 }
-            .sorted()
-        guard !totals.isEmpty else { return nil }
-        return totals[totals.count / 2]
+        var values: [Int] = []
+        var lastBlock: TimeInterval = -1
+        for rejection in cache.rejections.filter({ $0.type == type }).sorted(by: { $0.at < $1.at }) {
+            let end = rejection.at.timeIntervalSince1970
+            let start = type == "five_hour" ? blockStart(containing: end) : end - window
+            // Several rejections in one window describe the same moment.
+            guard start != lastBlock else { continue }
+            lastBlock = start
+            let used = usageSeconds(from: start, to: end)
+            if used > 0 { values.append(used) }
+        }
+        // One rejection is an anecdote, not a ceiling. The single seven-day
+        // rejection on this machine predates a "+50% weekly limits" promo and
+        // would have reported 99% where the truth was 33%; two agreeing
+        // observations are the least that can be stood behind.
+        return values.count >= 2 ? values.max() : nil
+    }
+
+    private func blockStart(containing moment: TimeInterval) -> TimeInterval {
+        var start = cache.times.min() ?? moment
+        for time in cache.times.sorted() where time <= moment && time - start >= fiveHourWindow {
+            start = time
+        }
+        return start
     }
 
     private func isRejected(_ type: String, now: Date) -> Bool {

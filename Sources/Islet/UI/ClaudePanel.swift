@@ -18,6 +18,13 @@ struct ClaudePanel: View {
         return "updated " + formatter.string(from: updated)
     }
 
+    /// Measured as time spent, not tokens: see ClaudeWindow for why.
+    private func footnote(for snapshot: ClaudeUsageMonitor.Snapshot) -> String {
+        snapshot.fiveHour.ceilingSeconds == nil && snapshot.sevenDay.ceilingSeconds == nil
+            ? "no ceiling learned yet — it appears once a limit is hit"
+            : "~ ceiling learned from when Claude Code cut you off"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
@@ -30,12 +37,6 @@ struct ClaudePanel: View {
                     .font(.system(size: 9))
                     .foregroundStyle(.white.opacity(0.3))
                     .monospacedDigit()
-                if let snapshot = claude.snapshot {
-                    IconButton(symbol: "target", size: 9) {
-                        ClaudeCalibration.run(snapshot: snapshot) { claude.refresh() }
-                    }
-                    .help("Calibrate against the percentages Claude Code reports")
-                }
                 IconButton(symbol: "arrow.clockwise", size: 9) { claude.refresh() }
                     .disabled(claude.isScanning)
                     .rotationEffect(.degrees(claude.isScanning ? 360 : 0))
@@ -51,9 +52,7 @@ struct ClaudePanel: View {
                 WindowRow(title: "This 5-hour block", window: snapshot.fiveHour, showsClock: true)
                 WindowRow(title: "Last 7 days", window: snapshot.sevenDay, showsClock: false)
 
-                Text(snapshot.fiveHour.budgetIsEstimated
-                     ? "~ estimated from past rate limits — tap the target to calibrate"
-                     : "calibrated against Claude Code")
+                Text(footnote(for: snapshot))
                     .font(.system(size: 8.5))
                     .foregroundStyle(.white.opacity(0.28))
             } else {
@@ -90,7 +89,7 @@ private struct WindowRow: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.white.opacity(0.75))
                 Spacer()
-                Text(window.percentText ?? window.tokensText)
+                Text(window.percentText ?? window.usageText)
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(accent)
                     .monospacedDigit()
@@ -99,8 +98,11 @@ private struct WindowRow: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.white.opacity(0.12))
+                    // With no ceiling learned there is no usage percentage, so the
+                    // bar falls back to the window's clock — dimmed, so it doesn't
+                    // read as the same measurement.
                     Capsule()
-                        .fill(accent.opacity(0.75))
+                        .fill(accent.opacity(window.percent == nil ? 0.3 : 0.75))
                         .frame(width: max(3, geo.size.width * (window.percent ?? window.elapsedFraction)))
                 }
             }
@@ -117,9 +119,9 @@ private struct WindowRow: View {
         if window.limitReached {
             return "rate limited · resets in " + window.remainingText
         }
-        var text = window.tokensText
-        if let budget = window.budgetText { text += " of \(budget)" }
-        text += " tokens"
+        var text = window.usageText
+        if let ceiling = window.ceilingText { text += " of \(ceiling)" }
+        text += " of use"
         if showsClock { text += " · resets in " + window.remainingText }
         return text
     }
