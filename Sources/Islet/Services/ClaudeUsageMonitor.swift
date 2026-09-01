@@ -94,6 +94,10 @@ final class ClaudeUsageMonitor: ObservableObject {
     @Published private(set) var snapshot: Snapshot?
     @Published private(set) var isScanning = false
 
+    /// Why the authoritative figures are unavailable, so the panel can say so
+    /// rather than quietly showing an estimate that looks like a readout.
+    @Published private(set) var apiFailure: ClaudeUsageAPI.Failure?
+
     private var reading: ClaudeUsageAPI.Reading?
     private var lastFetch: Date?
     /// The endpoint rate limits hard; well inside its safe interval.
@@ -149,9 +153,16 @@ final class ClaudeUsageMonitor: ObservableObject {
     private func fetchIfDue() async -> Bool {
         if let lastFetch, Date().timeIntervalSince(lastFetch) < fetchInterval { return false }
         lastFetch = Date()
-        guard case .success(let value) = await ClaudeUsageAPI.fetch() else { return false }
-        reading = value
-        return true
+        switch await ClaudeUsageAPI.fetch() {
+        case .success(let value):
+            reading = value
+            apiFailure = nil
+            return true
+        case .failure(let failure):
+            reading = nil
+            apiFailure = failure
+            return true
+        }
     }
 
     /// One-shot read for diagnostics.

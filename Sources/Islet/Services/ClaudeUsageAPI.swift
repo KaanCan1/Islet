@@ -28,10 +28,24 @@ enum ClaudeUsageAPI {
     }
 
     enum Failure: Error, Equatable {
+        /// No Claude Code CLI login on this machine.
         case noToken
+        /// Logged in once, but the access token has since expired. Claude Code
+        /// refreshes it when the CLI runs; a desktop-only install never does.
+        case expiredToken
         case unauthorized
         case rateLimited
         case transport
+
+        var explanation: String {
+            switch self {
+            case .noToken: return "sign in with the claude CLI for exact figures"
+            case .expiredToken: return "Claude token expired — run claude to refresh"
+            case .unauthorized: return "Claude rejected the token"
+            case .rateLimited: return "Claude's usage API is rate limiting"
+            case .transport: return "Claude's usage API is unreachable"
+            }
+        }
     }
 
     /// Claude Code's own User-Agent matters: without it the endpoint drops the
@@ -41,7 +55,12 @@ enum ClaudeUsageAPI {
     private static let endpoint = URL(string: "https://api.anthropic.com/api/oauth/usage")!
 
     static func fetch() async -> Result<Reading, Failure> {
-        guard let token = accessToken() else { return .failure(.noToken) }
+        let token: String
+        switch tokenState() {
+        case .valid(let value): token = value
+        case .expired: return .failure(.expiredToken)
+        case .missing: return .failure(.noToken)
+        }
 
         var request = URLRequest(url: endpoint)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -128,7 +147,17 @@ enum ClaudeUsageAPI {
                 return "\(service): no claudeAiOauth (holds \(topLevelKeys(service: service)))"
             }
             let present = (oauth["accessToken"] as? String).map { !$0.isEmpty } ?? false
-            return "\(service): token \(present ? "present" : "missing")\(expired(oauth) ? ", expired" : "")"
+            var when = ""
+            if let value = oauth["expiresAt"] as? Double {
+                let seconds = value > 1_000_000_000_000 ? value / 1000 : value
+                let date = Date(timeIntervalSince1970: seconds)
+                let formatter = DateFormatter()
+                formatter.dateFormat = "d MMM HH:mm"
+                when = ", \(expired(oauth) ? "expired" : "valid until") \(formatter.string(from: date))"
+            }
+            let refresh = (oauth["refreshToken"] as? String).map { !$0.isEmpty } ?? false
+            return "\(service): token \(present ? "present" : "missing")\(when)"
+                + ", refresh token \(refresh ? "present" : "missing")"
         }
         return described.joined(separator: " | ")
     }
@@ -142,9 +171,11 @@ enum ClaudeUsageAPI {
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
         var item: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-              let data = item as? Data
-        else { return "unreadable" }
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess, let data = item as? Data else {
+            let reason = SecCopyErrorMessageString(status, nil) as String? ?? "unknown"
+            return "unreadable, OSStatus \(status): \(reason)"
+        }
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return "\(data.count) bytes, not JSON"
         }
@@ -157,17 +188,29 @@ enum ClaudeUsageAPI {
         return Date(timeIntervalSince1970: seconds) < Date()
     }
 
+    private enum TokenState {
+        case missing
+        case expired
+        case valid(String)
+    }
+
     /// Reads the token Claude Code stored. Never logged, never copied anywhere.
-    private static func accessToken() -> String? {
+    /// Distinguishes "never signed in" from "signed in, token has aged out",
+    /// because the fix for each is different and worth telling the user.
+    private static func tokenState() -> TokenState {
+        var sawExpired = false
         for service in credentialServices() {
             guard let oauth = credentials(service: service),
                   let token = oauth["accessToken"] as? String, !token.isEmpty
             else { continue }
             // An expired token only earns a 401; skip the round trip.
-            if expired(oauth) { continue }
-            return token
+            if expired(oauth) {
+                sawExpired = true
+                continue
+            }
+            return .valid(token)
         }
-        return nil
+        return sawExpired ? .expired : .missing
     }
 }
 

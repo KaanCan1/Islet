@@ -22,6 +22,7 @@ struct ClaudePanel: View {
     /// Measured as time spent, not tokens: see ClaudeWindow for why.
     private func footnote(for snapshot: ClaudeUsageMonitor.Snapshot) -> String {
         if snapshot.fiveHour.isExact { return "figures from Claude's usage API" }
+        if let failure = claude.apiFailure { return "estimated — " + failure.explanation }
         if snapshot.fiveHour.ceilingSeconds == nil && snapshot.sevenDay.ceilingSeconds == nil {
             return "estimated — no ceiling learned yet"
         }
