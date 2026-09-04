@@ -45,6 +45,7 @@ enum Diagnostics {
             let five = reading.fiveHour.map { "\(Int($0.utilization * 100))%" } ?? "not reported"
             let seven = reading.sevenDay.map { "\(Int($0.utilization * 100))%" } ?? "not reported"
             print("Claude usage API: five_hour \(five), seven_day \(seven)")
+            print("  keychain: \(ClaudeUsageAPI.keychainTrust())")
         case .failure(let failure):
             print("Claude usage API: unavailable (\(failure)) — falling back to transcripts")
             print("  keychain: \(ClaudeUsageAPI.tokenStatus())")

@@ -306,6 +306,74 @@ enum ClaudeUsageAPI {
         return described.joined(separator: " | ")
     }
 
+    /// Whether this exact build is on the keychain item's partition list.
+    ///
+    /// macOS pins that list to a binary's cdhash, which every rebuild changes.
+    /// When it no longer matches, reading the token stops being silent and turns
+    /// into a login-password dialog — the same prompt over and over, since
+    /// "Always Allow" only appends to the trusted-app list and leaves the
+    /// partition list alone. Worth being able to see rather than guess at.
+    static func keychainTrust() -> String {
+        guard let hash = ownCodeHash() else { return "unsigned build — cannot be listed" }
+        guard let services = credentialServices().first else { return "no Claude item" }
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: services,
+            kSecReturnRef as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+              let reference = item, CFGetTypeID(reference) == SecKeychainItemGetTypeID()
+        else { return "partition list unreadable" }
+
+        var access: SecAccess?
+        guard SecKeychainItemCopyAccess(reference as! SecKeychainItem, &access) == errSecSuccess,
+              let access,
+              let list = { () -> [SecACL]? in
+                  var acls: CFArray?
+                  guard SecAccessCopyACLList(access, &acls) == errSecSuccess else { return nil }
+                  return acls as? [SecACL]
+              }()
+        else { return "partition list unreadable" }
+
+        // The partition entry keeps its payload as a hex-encoded plist whose
+        // strings are themselves hex, so the whole check is one substring test.
+        let needle = Data(("cdhash:" + hash).utf8)
+            .map { String(format: "%02x", $0) }.joined()
+        for acl in list {
+            let tags = SecACLCopyAuthorizations(acl) as? [String] ?? []
+            guard tags.contains(kSecACLAuthorizationPartitionID as String) else { continue }
+            var apps: CFArray?
+            var description: CFString?
+            var selector = SecKeychainPromptSelector()
+            guard SecACLCopyContents(acl, &apps, &description, &selector) == errSecSuccess,
+                  let payload = description as String?
+            else { return "partition list unreadable" }
+            return payload.lowercased().contains(needle)
+                ? "this build is on the partition list — no password prompt"
+                : "this build is NOT on the partition list — macOS will ask for the "
+                    + "login password once, and \"Always Allow\" will not stop it repeating"
+        }
+        return "item has no partition list — nothing to match"
+    }
+
+    /// This binary's cdhash, as hex.
+    private static func ownCodeHash() -> String? {
+        var code: SecCode?
+        guard SecCodeCopySelf([], &code) == errSecSuccess, let code else { return nil }
+        // SecCode and SecStaticCode are the same CoreFoundation family, and the
+        // signing-information call is only declared against the static one.
+        let statically = unsafeBitCast(code, to: SecStaticCode.self)
+        var information: CFDictionary?
+        guard SecCodeCopySigningInformation(statically, [], &information) == errSecSuccess,
+              let details = information as? [String: Any],
+              let unique = details[kSecCodeInfoUnique as String] as? Data
+        else { return nil }
+        return unique.map { String(format: "%02x", $0) }.joined()
+    }
+
     /// Key names only — used to explain an unexpected keychain layout.
     private static func topLevelKeys(service: String) -> String {
         let query: [String: Any] = [

@@ -50,6 +50,16 @@ own usage figures.
 | **Keychain** — "Islet wants to access Claude Code-credentials" | The OAuth token, to ask Claude for your real usage percentages. Islet also renews that token when it ages out, which means writing the item back | Only for exact Claude figures; declining falls back to a local estimate |
 | **Accessibility** | Emulating the media keys when something other than Spotify or Music is playing | No, only if you use the transport buttons in that case |
 
+The keychain prompt asks for your **login password**, not just Allow/Always Allow,
+and it comes back after every Islet update. That is macOS, not a bug: it pins the
+grant to the exact binary (its cdhash), which each build changes, and "Always
+Allow" only appends to the item's trusted-app list without touching that pin. One
+password entry per installed version is the floor for a self-signed app; only an
+Apple Developer ID certificate, which pins to a stable team id instead, would
+carry a grant across updates. `Islet --keychain-trust` says which side of it the
+running build is on, and reads nothing but the access list, so it never sets off
+the prompt it explains.
+
 Islet also asks once, itself, before reading anything under `~/.claude` — macOS
 does not gate that directory, so nothing would otherwise stop an app reading it
 quietly. Answer "Not now" and none of it is touched.
