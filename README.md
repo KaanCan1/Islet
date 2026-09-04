@@ -47,7 +47,7 @@ own usage figures.
 | Prompt | What for | Needed? |
 |---|---|---|
 | **Automation** — "Islet wants to control Spotify" | Reading the current track and driving the transport | Yes, for the music panel |
-| **Keychain** — "Islet wants to access Claude Code-credentials" | The OAuth token, to ask Claude for your real usage percentages | Only for exact Claude figures; declining falls back to a local estimate |
+| **Keychain** — "Islet wants to access Claude Code-credentials" | The OAuth token, to ask Claude for your real usage percentages. Islet also renews that token when it ages out, which means writing the item back | Only for exact Claude figures; declining falls back to a local estimate |
 | **Accessibility** | Emulating the media keys when something other than Spotify or Music is playing | No, only if you use the transport buttons in that case |
 
 Islet also asks once, itself, before reading anything under `~/.claude` — macOS
@@ -62,7 +62,11 @@ quietly. Answer "Not now" and none of it is touched.
   `GET /api/oauth/usage` on api.anthropic.com, the same endpoint `/usage` reads,
   and the panel says so. The token is the one the `claude` CLI writes to the login
   keychain — a desktop-app-only install doesn't have it, so log in once with the
-  CLI and Islet switches over on its own.
+  CLI and Islet switches over on its own. Access tokens last under a day, so Islet
+  renews them with the stored refresh token and writes the new pair back where the
+  CLI keeps it. Writing back is the point: the endpoint rotates the refresh token,
+  and keeping the new one to itself would log you out of Claude Code. Only that one
+  item is touched, in place, and everything else stored alongside it is preserved.
 - Without it, usage is **estimated** from `~/.claude/projects/*.jsonl` — timestamps
   and token counts only, never message content. Expect roughly a quarter of
   spread: nothing on disk states the account's limits, so the ceiling is inferred

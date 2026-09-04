@@ -48,6 +48,9 @@ enum Diagnostics {
         case .failure(let failure):
             print("Claude usage API: unavailable (\(failure)) — falling back to transcripts")
             print("  keychain: \(ClaudeUsageAPI.tokenStatus())")
+            if let detail = ClaudeUsageAPI.lastRenewDetail {
+                print("  renewal : \(detail)")
+            }
         case nil:
             print("Claude usage API: timed out")
         }
