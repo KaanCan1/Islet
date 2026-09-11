@@ -100,8 +100,12 @@ quietly. Answer "Not now" and none of it is touched.
 - Posture needs AirPods Pro, AirPods (3rd generation) or AirPods Max, and it only
   streams head motion while the feature is switched on — it costs AirPods battery,
   which is why it is off by default. The angle has to hold past the threshold for
-  two and a half minutes before anything is said, and there is a quarter of an
-  hour of quiet afterwards, so glancing at the keyboard never sets it off.
+  ninety seconds within any three-minute stretch before anything is said, and
+  there is ten minutes of quiet afterwards. Counting across a window rather than
+  demanding one unbroken run is the point: at a desk the angle crosses the line
+  constantly and rarely stays over it, so a rule that resets every time you lift
+  your head tracks perfectly and never speaks. Glancing at the keyboard still
+  never sets it off — those add up to nowhere near ninety seconds.
 - **Claude figures are the real ones** when the token is reachable: Islet reads
   `GET /api/oauth/usage` on api.anthropic.com, the same endpoint `/usage` reads,
   and the panel says so. The token is the one the `claude` CLI writes to the login

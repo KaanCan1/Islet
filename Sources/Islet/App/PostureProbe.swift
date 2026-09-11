@@ -84,6 +84,7 @@ enum PostureProbe {
             say("  \(pad(String(describing: monitor.availability)))"
                 + " calibrated=\(monitor.isCalibrated ? "yes" : "no ")"
                 + "  drop=\(pad(drop, 7))"
+                + "  budget=\(pad(String(format: "%.0f%%", monitor.budgetFraction * 100), 5))"
                 + "  tab=\(state.showsPosture ? "shown" : "HIDDEN")"
                 + "  \(monitor.isSlouching ? "SLOUCHING" : "upright")")
         }
@@ -102,8 +103,10 @@ enum PostureProbe {
             + "(\(Preferences.shared.postureCalibrated ? "stored" : "not stored"))")
         say("alerts pref   : \(Preferences.shared.postureAlerts ? "on" : "OFF - nothing will ever fire")")
         say("visible tabs  : \(tabs)")
-        say("threshold     : \(Int(PostureMonitor.thresholdDegrees))° held for "
-            + "\(Int(PostureMonitor.holdSeconds / 60)) min \(Int(PostureMonitor.holdSeconds) % 60)s")
+        say("nudge rule    : \(Int(PostureMonitor.budgetSeconds))s past "
+            + "\(Int(PostureMonitor.thresholdDegrees))° within any "
+            + "\(Int(PostureMonitor.windowSeconds / 60)) min, then "
+            + "\(Int(PostureMonitor.cooldownSeconds / 60)) min quiet")
 
         if lastDrop == nil {
             say("")

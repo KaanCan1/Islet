@@ -26,11 +26,18 @@ final class PostureMonitor: NSObject, ObservableObject {
 
     /// How far below upright counts as slouching.
     static let thresholdDegrees: Double = 18
-    /// How long it has to stay there before Islet says anything. Long enough
-    /// that reading something on your desk is not a slouch, short enough that
-    /// you can hold your head down and watch it happen — at two and a half
-    /// minutes nobody could tell the feature from a broken one.
-    static let holdSeconds: TimeInterval = 60
+    /// How far back the nudge looks.
+    ///
+    /// Time past the threshold is counted across this window rather than
+    /// demanded in one unbroken run. At a desk the angle crosses the line
+    /// constantly and rarely stays over it — lifting your head for a moment
+    /// used to reset the whole count, which is why the feature tracked
+    /// correctly for hours and never once spoke.
+    static let windowSeconds: TimeInterval = 180
+    /// How much of that window spent down earns a nudge. Long enough that
+    /// reading something on the desk is not a slouch, short enough to see it
+    /// happen if you deliberately hold your head down.
+    static let budgetSeconds: TimeInterval = 90
     /// Quiet period after an alert, so it nags at most a few times an hour.
     static let cooldownSeconds: TimeInterval = 600
 
@@ -46,10 +53,19 @@ final class PostureMonitor: NSObject, ObservableObject {
     /// Fires with the number of minutes the head has been down continuously.
     var onSlouch: ((Int) -> Void)?
 
+    /// One processed reading: how long it covered, and whether it was past the
+    /// threshold. Readings are throttled to a couple a second, so a full window
+    /// is a few hundred of these.
+    private struct Sample {
+        let at: Date
+        let seconds: TimeInterval
+        let isDown: Bool
+    }
+
     private let manager = CMHeadphoneMotionManager()
     private let prefs = Preferences.shared
 
-    private var slouchingSince: Date?
+    private var recent: [Sample] = []
     private var lastAlert: Date?
     private var lastSample: Date?
     private var statsDay: Date = Calendar.current.startOfDay(for: Date())
@@ -144,7 +160,7 @@ final class PostureMonitor: NSObject, ObservableObject {
         availability = .unavailable
         drop = nil
         isSlouching = false
-        slouchingSince = nil
+        recent.removeAll()
         lastSample = nil
         lastProcessed = nil
         calibrationSamples = []
@@ -165,7 +181,7 @@ final class PostureMonitor: NSObject, ObservableObject {
         calibrationSamples = []
         drop = 0
         isSlouching = false
-        slouchingSince = nil
+        recent.removeAll()
     }
 
     // MARK: - Sampling
@@ -198,35 +214,42 @@ final class PostureMonitor: NSObject, ObservableObject {
             if elapsed <= 2 {
                 wornSeconds += elapsed
                 if degrees >= Self.thresholdDegrees { slouchedSeconds += elapsed }
+                updateSlouch(degrees: degrees, elapsed: elapsed, at: now)
             }
         }
         lastSample = now
-
-        updateSlouch(degrees: degrees, now: now)
     }
 
-    private func updateSlouch(degrees: Double, now: Date) {
-        guard degrees >= Self.thresholdDegrees else {
-            // A little hysteresis: sitting up clears it, twitching does not.
-            if degrees < Self.thresholdDegrees - 4 {
-                isSlouching = false
-                slouchingSince = nil
-            }
-            return
+    private func updateSlouch(degrees: Double, elapsed: TimeInterval, at now: Date) {
+        let isDown = degrees >= Self.thresholdDegrees
+        // A little hysteresis on the label only: sitting up clears it, twitching
+        // does not. What earns a nudge is the budget below, not this.
+        if isDown {
+            isSlouching = true
+        } else if degrees < Self.thresholdDegrees - 4 {
+            isSlouching = false
         }
 
-        isSlouching = true
-        guard let since = slouchingSince else {
-            slouchingSince = now
-            return
-        }
+        recent.append(Sample(at: now, seconds: elapsed, isDown: isDown))
+        let cutoff = now.addingTimeInterval(-Self.windowSeconds)
+        recent.removeAll { $0.at < cutoff }
 
-        let held = now.timeIntervalSince(since)
-        guard held >= Self.holdSeconds else { return }
+        let down = recent.reduce(0) { $0 + ($1.isDown ? $1.seconds : 0) }
+        guard down >= Self.budgetSeconds else { return }
         if let last = lastAlert, now.timeIntervalSince(last) < Self.cooldownSeconds { return }
 
         lastAlert = now
-        onSlouch?(max(1, Int(held / 60)))
+        // Spent: the next nudge has to be earned from scratch rather than
+        // arriving the moment the quiet period lapses.
+        recent.removeAll()
+        onSlouch?(max(1, Int(down / 60)))
+    }
+
+    /// How close the current window is to earning a nudge, for the panel.
+    var budgetFraction: Double {
+        guard isCalibrated else { return 0 }
+        let down = recent.reduce(0) { $0 + ($1.isDown ? $1.seconds : 0) }
+        return min(1, down / Self.budgetSeconds)
     }
 
     private func rolloverIfNeeded(_ now: Date) {
@@ -267,7 +290,7 @@ extension PostureMonitor: CMHeadphoneMotionManagerDelegate {
             self.availability = .unavailable
             self.drop = nil
             self.isSlouching = false
-            self.slouchingSince = nil
+            self.recent.removeAll()
             self.lastSample = nil
             self.calibrationSamples = []
         }
