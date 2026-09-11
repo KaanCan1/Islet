@@ -10,6 +10,7 @@ final class NotchController {
     private var panel: NotchPanel?
     private var hoverTimer: Timer?
     private let battery = BatteryMonitor()
+    private let screenshots = ScreenshotWatcher()
 
     func start() {
         rebuild()
@@ -37,6 +38,7 @@ final class NotchController {
         }
         RunLoop.main.add(timer, forMode: .common)
         hoverTimer = timer
+
     }
 
     // MARK: - System alerts
@@ -53,7 +55,52 @@ final class NotchController {
             ))
         }
         battery.start()
+
+        // A new screenshot pops the shelf open for a few seconds. That window is
+        // the whole feature: macOS's own thumbnail cannot be dragged once it has
+        // faded, and this one can — and it stays on the shelf afterwards.
+        screenshots.onCapture = { [weak self] url in
+            guard let self else { return }
+            self.state.shelf.add(url)
+            self.revealShelf()
+        }
+
+        state.posture.onSlouch = { [weak self] minutes in
+            guard let self, let drop = self.state.posture.drop else { return }
+            self.state.present(.posture(degrees: Int(drop.rounded()), minutes: minutes))
+        }
+
         updateClaudeMonitor()
+        updateShelfWatcher()
+        updatePostureMonitor()
+    }
+
+    /// Brings the shelf up without stealing the panel from someone mid-drag.
+    private func revealShelf() {
+        guard !state.interactionLocked else { return }
+        state.tab = .shelf
+        state.forceExpandUntil = Date().addingTimeInterval(4)
+    }
+
+    /// The screenshot folder is only watched while the shelf is on, so the app
+    /// holds no handle on it otherwise.
+    func updateShelfWatcher() {
+        if state.prefs.shelfEnabled {
+            screenshots.start()
+        } else {
+            screenshots.stop()
+            state.shelf.clear()
+        }
+    }
+
+    /// Head motion is only requested while posture alerts are on: streaming it
+    /// costs AirPods battery, so it is not something to leave running by default.
+    func updatePostureMonitor() {
+        if state.prefs.postureAlerts {
+            state.posture.enable()
+        } else {
+            state.posture.disable()
+        }
     }
 
     /// Claude Code transcripts are only read once the feature is switched on.
@@ -133,6 +180,9 @@ final class NotchController {
         state.isExpanded = expanded
         // While collapsed the panel must let clicks through to the menu bar.
         panel?.ignoresMouseEvents = !expanded
+        // Files on the shelf move and get deleted behind Islet's back; opening
+        // the panel is the natural moment to notice.
+        if expanded { state.shelf.prune() }
         state.music.isActive = expanded
         if expanded {
             NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)

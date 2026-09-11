@@ -61,6 +61,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         addToggle(to: menu, title: "Claude usage in the music panel", id: "claude", action: #selector(toggleClaude))
         addToggle(to: menu, title: "Show on lock screen", id: "lock", action: #selector(toggleLockScreen))
         addToggle(to: menu, title: "Battery and charging alerts", id: "battery", action: #selector(toggleBattery))
+        addToggle(to: menu, title: "Screenshot shelf", id: "shelf", action: #selector(toggleShelf))
+        addToggle(to: menu, title: "Posture alerts (AirPods)", id: "posture", action: #selector(togglePosture))
         addToggle(to: menu, title: "Timer chime", id: "chime", action: #selector(toggleChime))
         addToggle(to: menu, title: "Launch at login", id: "login", action: #selector(toggleLogin))
 
@@ -88,6 +90,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc private func toggleBattery() { Preferences.shared.showBatteryAlerts.toggle() }
 
+    @objc private func toggleShelf() {
+        Preferences.shared.shelfEnabled.toggle()
+        controller.updateShelfWatcher()
+    }
+
+    /// Turning this on is left to stand even with nothing connected: AirPods come
+    /// and go, and Islet picks them up when they do. The alert only explains why
+    /// nothing has appeared yet.
+    @objc private func togglePosture() {
+        let prefs = Preferences.shared
+        prefs.postureAlerts.toggle()
+        controller.updatePostureMonitor()
+
+        guard prefs.postureAlerts, !controller.state.posture.isSupported else { return }
+        let alert = NSAlert()
+        alert.messageText = "No headphones reporting head motion"
+        alert.informativeText = "Posture tracking reads the head angle from AirPods Pro, AirPods (3rd "
+            + "generation) or AirPods Max. Islet will start as soon as a pair is connected.\n\n"
+            + "Open the panel afterwards and press \"Set upright\" while sitting how you mean to sit — "
+            + "every reading is measured from that."
+        alert.alertStyle = .informational
+        alert.runModal()
+    }
+
     @objc private func toggleLockScreen() {
         Preferences.shared.showOnLockScreen.toggle()
         controller.applyWindowLevel()
@@ -113,6 +139,8 @@ extension AppDelegate: NSMenuDelegate {
             case "lock": item.state = prefs.showOnLockScreen ? .on : .off
             case "claude": item.state = prefs.showClaudeUsage ? .on : .off
             case "battery": item.state = prefs.showBatteryAlerts ? .on : .off
+            case "shelf": item.state = prefs.shelfEnabled ? .on : .off
+            case "posture": item.state = prefs.postureAlerts ? .on : .off
             case "chime": item.state = prefs.chimeEnabled ? .on : .off
             case "login": item.state = prefs.launchAtLogin ? .on : .off
             default: break

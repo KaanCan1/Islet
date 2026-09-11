@@ -59,7 +59,9 @@ struct NotchRootView: View {
             Group {
                 switch state.effectiveTab {
                 case .music: MusicPanel(music: music, state: state, claude: state.claude)
+                case .shelf: ShelfPanel(shelf: state.shelf)
                 case .timer: TimerPanel(pomodoro: pomodoro, state: state)
+                case .posture: PosturePanel(posture: state.posture)
                 case .claude: ClaudePanel(claude: state.claude)
                 }
             }

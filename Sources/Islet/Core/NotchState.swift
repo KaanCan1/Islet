@@ -4,13 +4,15 @@ import Combine
 @MainActor
 final class NotchState: ObservableObject {
     enum Tab: String, CaseIterable, Identifiable {
-        case music, timer, claude
+        case music, shelf, timer, posture, claude
         var id: String { rawValue }
 
         var icon: String {
             switch self {
             case .music: return "music.note"
+            case .shelf: return "photo.on.rectangle.angled"
             case .timer: return "timer"
+            case .posture: return "figure.seated.side"
             case .claude: return "gauge.medium"
             }
         }
@@ -18,7 +20,9 @@ final class NotchState: ObservableObject {
         var height: CGFloat {
             switch self {
             case .music: return Layout.musicHeight
+            case .shelf: return Layout.shelfHeight
             case .timer: return Layout.timerHeight
+            case .posture: return Layout.postureHeight
             case .claude: return Layout.claudeHeight
             }
         }
@@ -38,6 +42,8 @@ final class NotchState: ObservableObject {
     let music = MusicManager()
     let pomodoro = PomodoroTimer()
     let claude = ClaudeUsageMonitor()
+    let shelf = ShelfStore()
+    let posture = PostureMonitor()
     let prefs = Preferences.shared
 
     var metrics: NotchMetrics?
@@ -46,7 +52,8 @@ final class NotchState: ObservableObject {
     init() {
         // Changes in the child objects affect the peek width, so forward them up.
         for publisher in [music.objectWillChange, pomodoro.objectWillChange,
-                          claude.objectWillChange, prefs.objectWillChange] {
+                          claude.objectWillChange, shelf.objectWillChange,
+                          posture.objectWillChange, prefs.objectWillChange] {
             publisher.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &bag)
         }
         // When the timer finishes, open the panel on the Timer tab.
@@ -66,8 +73,27 @@ final class NotchState: ObservableObject {
         prefs.showClaudeUsage && claude.snapshot != nil
     }
 
+    /// The shelf appears when it is holding something and goes away when the last
+    /// screenshot is taken off it, so the tab bar stays empty until it earns a slot.
+    var showsShelf: Bool {
+        prefs.shelfEnabled && !shelf.isEmpty
+    }
+
+    /// Posture needs AirPods that report head motion; without them there is
+    /// nothing to show and the tab never appears.
+    var showsPosture: Bool {
+        prefs.postureAlerts && posture.availability == .tracking
+    }
+
     var visibleTabs: [Tab] {
-        showsClaude ? Tab.allCases : Tab.allCases.filter { $0 != .claude }
+        Tab.allCases.filter { tab in
+            switch tab {
+            case .shelf: return showsShelf
+            case .posture: return showsPosture
+            case .claude: return showsClaude
+            case .music, .timer: return true
+            }
+        }
     }
 
     /// Falls back to music if the selected tab has just disappeared.
@@ -86,7 +112,7 @@ final class NotchState: ObservableObject {
 
     func present(_ new: NotchActivity) {
         // Never interrupt someone who is using the panel.
-        guard !isExpanded, prefs.showBatteryAlerts else { return }
+        guard !isExpanded, new.isEnabled else { return }
         activity = new
         activityExpiry = Date().addingTimeInterval(new.duration)
     }
@@ -169,7 +195,7 @@ final class NotchState: ObservableObject {
     /// tab to a short one otherwise leaves the cursor below the new hit rect —
     /// which collapses the panel the instant you click the tab you wanted.
     var expandedHitRect: CGRect {
-        let tallest = Tab.allCases.map(\.height).max() ?? effectiveTab.height
+        let tallest = visibleTabs.map(\.height).max() ?? effectiveTab.height
         let size = CGSize(width: expandedSize.width + Layout.hoverSlack * 2,
                           height: notchSize.height + tallest)
         return rect(size: size, extraBottom: Layout.tabBarGap + Layout.tabBarHeight + Layout.hoverSlack)

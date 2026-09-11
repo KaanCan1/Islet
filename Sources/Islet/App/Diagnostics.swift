@@ -34,6 +34,17 @@ enum Diagnostics {
             print("Battery: no power source reported (desktop Mac?)")
         }
 
+        let folder = ScreenshotWatcher.screenshotDirectory()
+        // Listing it is also the access check: the shelf is dead without it, and
+        // macOS gates Desktop, Documents and Downloads whether or not you notice.
+        let readable = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) != nil
+        print("Screenshot shelf: \(Preferences.shared.shelfEnabled ? "on" : "off"), watching \(folder.path)")
+        print("  folder access : \(readable ? "readable" : "denied - allow Islet under Privacy & Security > Files and Folders")")
+
+        print("Posture: \(Preferences.shared.postureAlerts ? "on" : "off"), "
+              + "headphone motion \(PostureMonitor().isSupported ? "available" : "no supported AirPods connected"), "
+              + "permission \(PostureMonitor.authorizationText)")
+
         let box = APIBox()
         let semaphore = DispatchSemaphore(value: 0)
         Task { box.result = await ClaudeUsageAPI.fetch(); semaphore.signal() }

@@ -19,6 +19,15 @@ enum Layout {
     static let musicHeight: CGFloat = 100
     static let timerHeight: CGFloat = 108
     static let claudeHeight: CGFloat = 138
+    static let shelfHeight: CGFloat = 108
+    static let postureHeight: CGFloat = 116
+
+    /// One screenshot on the shelf. Four of these plus their gaps is what sets
+    /// `ShelfStore.capacity`: they have to fit inside `contentWidth` less the
+    /// panel's own 13pt margins, so widen a tile and the shelf holds fewer.
+    /// 4 x 96 + 3 x 10 = 414, which is exactly that budget.
+    static let shelfTile = CGSize(width: 96, height: 60)
+    static let shelfGap: CGFloat = 10
 
     /// Height of a transient alert (battery) below the notch strip.
     static let activityHeight: CGFloat = 26

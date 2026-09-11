@@ -30,6 +30,8 @@
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Islet reads what is playing and controls playback in Music and Spotify.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Islet reads the head angle from your AirPods to tell you when you have been leaning over the screen. It stays on this Mac.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT License</string>
 </dict>

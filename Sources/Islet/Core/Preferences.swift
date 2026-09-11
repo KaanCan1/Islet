@@ -19,6 +19,12 @@ final class Preferences: ObservableObject {
     @Published var showOnLockScreen: Bool { didSet { store.set(showOnLockScreen, forKey: "showOnLockScreen") } }
     /// Open the panel when the charger is connected or the battery runs low.
     @Published var showBatteryAlerts: Bool { didSet { store.set(showBatteryAlerts, forKey: "showBatteryAlerts") } }
+    /// Catch new screenshots and keep them on the shelf to drag out.
+    @Published var shelfEnabled: Bool { didSet { store.set(shelfEnabled, forKey: "shelfEnabled") } }
+    /// Track head angle from AirPods and say when it has been down too long.
+    @Published var postureAlerts: Bool { didSet { store.set(postureAlerts, forKey: "postureAlerts") } }
+    /// The head pitch, in radians, recorded as sitting upright.
+    @Published var uprightPitch: Double { didSet { store.set(uprightPitch, forKey: "uprightPitch") } }
     @Published var focusMinutes: Int { didSet { store.set(focusMinutes, forKey: "focusMinutes") } }
     @Published var breakMinutes: Int { didSet { store.set(breakMinutes, forKey: "breakMinutes") } }
 
@@ -29,6 +35,9 @@ final class Preferences: ObservableObject {
             "claudeConsentAsked": false,
             "showOnLockScreen": true,
             "showBatteryAlerts": true,
+            "shelfEnabled": true,
+            "postureAlerts": false,
+            "uprightPitch": 0.0,
             "chimeEnabled": true,
             "focusMinutes": 25,
             "breakMinutes": 5
@@ -38,6 +47,9 @@ final class Preferences: ObservableObject {
         claudeConsentAsked = store.bool(forKey: "claudeConsentAsked")
         showOnLockScreen = store.bool(forKey: "showOnLockScreen")
         showBatteryAlerts = store.bool(forKey: "showBatteryAlerts")
+        shelfEnabled = store.bool(forKey: "shelfEnabled")
+        postureAlerts = store.bool(forKey: "postureAlerts")
+        uprightPitch = store.double(forKey: "uprightPitch")
         chimeEnabled = store.bool(forKey: "chimeEnabled")
         focusMinutes = store.integer(forKey: "focusMinutes")
         breakMinutes = store.integer(forKey: "breakMinutes")

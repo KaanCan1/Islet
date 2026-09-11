@@ -17,6 +17,16 @@ playing in.
 beside the transport. Click it for the weekly window too. The column and its tab
 disappear entirely if you don't use Claude Code.
 
+**Shelf** — every screenshot you take lands here the moment it is written, and
+the panel opens for a few seconds to show it. Click one to open it the way the
+system thumbnail does, or drag it straight out into Finder, a chat or a mail
+draft. macOS draws its own thumbnail in the corner, but you cannot pull a file
+out of it once it has faded; this one keeps the last four until you use them.
+
+**Posture** — with AirPods in, how far your head is tipped forward of where you
+calibrated upright, and how much of today has been spent that way. If it stays
+down for a few minutes, the notch says so once and then leaves you alone.
+
 **Timer** — a pomodoro with Focus and Break modes. Plus battery alerts when the
 charger goes in or out, and an option to stay visible on the lock screen.
 
@@ -49,6 +59,8 @@ own usage figures.
 | **Automation** — "Islet wants to control Spotify" | Reading the current track and driving the transport | Yes, for the music panel |
 | **Keychain** — "Islet wants to access Claude Code-credentials" | The OAuth token, to ask Claude for your real usage percentages. Islet also renews that token when it ages out, which means writing the item back | Only for exact Claude figures; declining falls back to a local estimate |
 | **Accessibility** | Emulating the media keys when something other than Spotify or Music is playing | No, only if you use the transport buttons in that case |
+| **Files and Folders** — "Islet wants to access files in your Desktop folder" | Watching wherever screenshots are saved, so the shelf can catch them | Yes, for the shelf; it reads nothing else in that folder |
+| **Motion** — "Islet wants to access motion activity" | Head angle from AirPods, for the posture tab | Only for posture, which is off until you switch it on |
 
 The keychain prompt asks for your **login password**, not just Allow/Always Allow,
 and it comes back after every Islet update. That is macOS, not a bug: it pins the
@@ -68,6 +80,23 @@ quietly. Answer "Not now" and none of it is touched.
 
 - Now playing comes from AppleScript, not private APIs: macOS 15.4 closed
   `MediaRemote` to unentitled apps.
+- The shelf watches whichever folder `com.apple.screencapture` points at, usually
+  the Desktop. A new file only counts as a screenshot if `screencapture` stamped
+  it with the `kMDItemIsScreenCapture` extended attribute, which it writes as the
+  file is saved — so everything else you keep on the Desktop is ignored, and no
+  Spotlight query is involved. Nothing is copied: the shelf holds references, and
+  taking an item off it leaves the file exactly where it was.
+- **Posture is head angle, not posture.** It measures how far your head is tipped
+  forward of the angle you called upright, which is a decent stand-in for leaning
+  into the screen and says nothing at all about your back. Sitting badly with a
+  level head reads as fine. It is a nudge, not advice, and certainly not medical
+  advice. Calibration matters: the sensor's zero depends on how the AirPods sit
+  in your ears, so press "Set upright" while sitting how you mean to sit.
+- Posture needs AirPods Pro, AirPods (3rd generation) or AirPods Max, and it only
+  streams head motion while the feature is switched on — it costs AirPods battery,
+  which is why it is off by default. The angle has to hold past the threshold for
+  two and a half minutes before anything is said, and there is a quarter of an
+  hour of quiet afterwards, so glancing at the keyboard never sets it off.
 - **Claude figures are the real ones** when the token is reachable: Islet reads
   `GET /api/oauth/usage` on api.anthropic.com, the same endpoint `/usage` reads,
   and the panel says so. The token is the one the `claude` CLI writes to the login
