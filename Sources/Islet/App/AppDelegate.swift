@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         controller.start()
         setupStatusItem()
+        controller.onContextMenu = { [weak self] point in self?.showMenu(at: point) }
         askAboutClaudeIfNeeded()
     }
 
@@ -47,6 +48,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item.button?.image?.isTemplate = true
         item.menu = buildMenu()
         statusItem = item
+    }
+
+    /// A fresh menu each time rather than the status item's own: that one belongs
+    /// to the status item, and popping it up from somewhere else fights it for
+    /// ownership. Building it again is cheap and keeps both in step.
+    private func showMenu(at point: NSPoint) {
+        buildMenu().popUp(positioning: nil, at: point, in: nil)
     }
 
     private func buildMenu() -> NSMenu {

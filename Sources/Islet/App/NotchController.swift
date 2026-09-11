@@ -11,6 +11,15 @@ final class NotchController {
     private var hoverTimer: Timer?
     private let battery = BatteryMonitor()
     private let screenshots = ScreenshotWatcher()
+    private var rightClickMonitor: Any?
+
+    /// Right-clicking the open panel asks for the settings menu.
+    ///
+    /// The menu bar icon cannot be relied on as the only way in: on a crowded
+    /// menu bar — and a notch leaves half of one — macOS hides the items that do
+    /// not fit, without saying so, and a newly added item is the first to go.
+    /// The notch itself is always there, so it carries the same menu.
+    var onContextMenu: ((NSPoint) -> Void)?
 
     func start() {
         rebuild()
@@ -39,6 +48,21 @@ final class NotchController {
         RunLoop.main.add(timer, forMode: .common)
         hoverTimer = timer
 
+        // Returns a plain Bool rather than the event itself: handing an NSEvent
+        // back across the isolation boundary is an error under Swift 6.
+        rightClickMonitor = NSEvent.addLocalMonitorForEvents(matching: .rightMouseDown) { [weak self] event in
+            let swallowed = MainActor.assumeIsolated { () -> Bool in
+                guard let self, let panel = self.panel,
+                      event.window === panel, self.state.isExpanded else { return false }
+                // Hold the panel open: the menu takes the cursor with it, and
+                // without this the panel collapses out from under its own menu.
+                self.state.interactionLocked = true
+                self.onContextMenu?(NSEvent.mouseLocation)
+                self.state.interactionLocked = false
+                return true
+            }
+            return swallowed ? nil : event
+        }
     }
 
     // MARK: - System alerts

@@ -45,8 +45,10 @@ make install
 ```
 
 That's it — the app is built, copied to `/Applications` and launched. It lives in
-the menu bar with no Dock icon, and every setting is in that menu. Use `make run`
-to try it without installing.
+the menu bar with no Dock icon, and every setting is in that menu. **Right-click
+the open panel for the same menu** — a notch halves the menu bar, and macOS
+quietly hides the status items that no longer fit, so the icon is not always
+there to click. Use `make run` to try it without installing.
 
 ## Permissions
 
