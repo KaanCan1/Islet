@@ -50,6 +50,8 @@ final class NotchController {
 
         // Returns a plain Bool rather than the event itself: handing an NSEvent
         // back across the isolation boundary is an error under Swift 6.
+        startStateLogIfAsked()
+
         rightClickMonitor = NSEvent.addLocalMonitorForEvents(matching: .rightMouseDown) { [weak self] event in
             let swallowed = MainActor.assumeIsolated { () -> Bool in
                 guard let self, let panel = self.panel,
@@ -97,6 +99,36 @@ final class NotchController {
         updateClaudeMonitor()
         updateShelfWatcher()
         updatePostureMonitor()
+    }
+
+    /// ISLET_STATE_LOG=<file> appends what the posture monitor is actually doing
+    /// inside the running app. --posture cannot answer that: only one process at
+    /// a time receives headphone motion, so a probe started alongside the app is
+    /// starved and reports nothing.
+    private func startStateLogIfAsked() {
+        guard let path = ProcessInfo.processInfo.environment["ISLET_STATE_LOG"], !path.isEmpty
+        else { return }
+        let timer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let posture = self.state.posture
+                let drop = posture.drop.map { String(format: "%+.1f°", $0) } ?? "—"
+                let line = "\(Date().formatted(date: .omitted, time: .standard))"
+                    + "  availability=\(posture.availability)"
+                    + "  calibrated=\(posture.isCalibrated)"
+                    + "  drop=\(drop)"
+                    + "  showsPosture=\(self.state.showsPosture)"
+                    + "  tabs=\(self.state.visibleTabs.map(\.rawValue).joined(separator: "/"))\n"
+                if let handle = FileHandle(forWritingAtPath: path) {
+                    handle.seekToEndOfFile()
+                    handle.write(Data(line.utf8))
+                    try? handle.close()
+                } else {
+                    try? line.write(toFile: path, atomically: true, encoding: .utf8)
+                }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
     }
 
     /// Brings the shelf up without stealing the panel from someone mid-drag.

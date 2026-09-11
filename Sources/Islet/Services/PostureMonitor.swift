@@ -26,10 +26,13 @@ final class PostureMonitor: NSObject, ObservableObject {
 
     /// How far below upright counts as slouching.
     static let thresholdDegrees: Double = 18
-    /// How long it has to stay there before Islet says anything.
-    static let holdSeconds: TimeInterval = 150
+    /// How long it has to stay there before Islet says anything. Long enough
+    /// that reading something on your desk is not a slouch, short enough that
+    /// you can hold your head down and watch it happen — at two and a half
+    /// minutes nobody could tell the feature from a broken one.
+    static let holdSeconds: TimeInterval = 60
     /// Quiet period after an alert, so it nags at most a few times an hour.
-    static let cooldownSeconds: TimeInterval = 900
+    static let cooldownSeconds: TimeInterval = 600
 
     @Published private(set) var availability: Availability = .unavailable
     /// False until a reference angle exists. Nothing is judged before then.

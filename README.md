@@ -133,6 +133,13 @@ quietly. Answer "Not now" and none of it is touched.
   to the shell, and CoreMotion has the process killed on the spot. `open
   ./dist/Islet.app --env ISLET_PROBE_OUT=/tmp/posture.txt --args --posture`
   writes the report to a file, since a launched app has no terminal to print to.
+  Quit Islet before running it: only one process at a time is fed head motion,
+  and the one that loses is fed silence rather than an error, so a probe started
+  next to the running app reports nothing and blames the AirPods for it.
+- `open ./dist/Islet.app --env ISLET_STATE_LOG=/tmp/islet.log` writes what the
+  posture monitor is doing inside the running app every two seconds — the live
+  angle, whether it has a reference yet, and which tabs the panel is showing.
+  It is the only way to see that, for the reason above.
 
 ## License and notices
 
