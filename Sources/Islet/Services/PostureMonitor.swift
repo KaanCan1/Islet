@@ -32,6 +32,8 @@ final class PostureMonitor: NSObject, ObservableObject {
     static let cooldownSeconds: TimeInterval = 900
 
     @Published private(set) var availability: Availability = .unavailable
+    /// False until a reference angle exists. Nothing is judged before then.
+    @Published private(set) var isCalibrated = false
     /// Degrees below the calibrated upright angle; positive means head down.
     @Published private(set) var drop: Double?
     @Published private(set) var isSlouching = false
@@ -53,10 +55,15 @@ final class PostureMonitor: NSObject, ObservableObject {
     private var retry: Timer?
     /// Samples arrive at about 25 Hz; nothing here needs more than a couple a second.
     private var lastProcessed: Date?
+    /// First readings after starting, used to settle on an upright angle without
+    /// making anyone press a button to get a working feature.
+    private var calibrationSamples: [Double] = []
+    private static let calibrationCount = 12
 
     override init() {
         super.init()
         manager.delegate = self
+        isCalibrated = prefs.postureCalibrated
     }
 
     // MARK: - Lifecycle
@@ -94,7 +101,12 @@ final class PostureMonitor: NSObject, ObservableObject {
     }
 
     private func attach() {
-        guard !manager.isDeviceMotionActive else { return }
+        // Already streaming: say so. Returning without this left the panel
+        // believing nothing was connected after AirPods dropped and came back.
+        guard !manager.isDeviceMotionActive else {
+            availability = .tracking
+            return
+        }
 
         switch CMHeadphoneMotionManager.authorizationStatus() {
         case .denied, .restricted:
@@ -132,6 +144,7 @@ final class PostureMonitor: NSObject, ObservableObject {
         slouchingSince = nil
         lastSample = nil
         lastProcessed = nil
+        calibrationSamples = []
     }
 
     /// Records the current angle as sitting upright. Everything is measured
@@ -139,7 +152,14 @@ final class PostureMonitor: NSObject, ObservableObject {
     /// happen to sit in your ears.
     func calibrate() {
         guard let motion = manager.deviceMotion else { return }
-        prefs.uprightPitch = motion.attitude.pitch
+        setUpright(motion.attitude.pitch)
+    }
+
+    private func setUpright(_ pitch: Double) {
+        prefs.uprightPitch = pitch
+        prefs.postureCalibrated = true
+        isCalibrated = true
+        calibrationSamples = []
         drop = 0
         isSlouching = false
         slouchingSince = nil
@@ -153,6 +173,16 @@ final class PostureMonitor: NSObject, ObservableObject {
         lastProcessed = now
 
         rolloverIfNeeded(now)
+
+        // No reference angle yet: gather a few seconds and take the middle of
+        // them, so the feature works on its own. Whatever you are doing then
+        // becomes "upright", which is why the panel keeps offering to redo it.
+        guard isCalibrated else {
+            calibrationSamples.append(motion.attitude.pitch)
+            guard calibrationSamples.count >= Self.calibrationCount else { return }
+            setUpright(calibrationSamples.sorted()[calibrationSamples.count / 2])
+            return
+        }
 
         // Positive = tipped forward of the calibrated upright angle.
         let degrees = (prefs.uprightPitch - motion.attitude.pitch) * 180 / .pi
@@ -236,6 +266,7 @@ extension PostureMonitor: CMHeadphoneMotionManagerDelegate {
             self.isSlouching = false
             self.slouchingSince = nil
             self.lastSample = nil
+            self.calibrationSamples = []
         }
     }
 }

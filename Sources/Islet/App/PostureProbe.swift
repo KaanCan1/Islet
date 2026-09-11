@@ -1,0 +1,88 @@
+import AppKit
+import CoreMotion
+
+/// `Islet --posture` watches the headphone motion stream for a few seconds and
+/// says exactly what it gets back.
+///
+/// Worth its own mode because everything about this feature fails silently: the
+/// permission prompt, the connection and the sample stream all just produce
+/// nothing when they go wrong, and the panel cannot tell you which one it was.
+enum PostureProbe {
+    /// Collected rather than printed as it goes: launched through LaunchServices
+    /// — which is the only way to reproduce how the app itself starts — there is
+    /// no terminal to print to, so `ISLET_PROBE_OUT` names a file instead.
+    private static var lines: [String] = []
+
+    private static func say(_ text: String) {
+        lines.append(text)
+        print(text)
+    }
+
+    private static func flush() {
+        guard let path = ProcessInfo.processInfo.environment["ISLET_PROBE_OUT"], !path.isEmpty
+        else { return }
+        try? lines.joined(separator: "\n").appending("\n").write(toFile: path, atomically: true, encoding: .utf8)
+    }
+
+    @MainActor
+    static func run(seconds: TimeInterval = 12) {
+        // CoreMotion talks to a daemon, which needs an application to attribute
+        // the request to. Without this the answer means nothing.
+        let application = NSApplication.shared
+        application.setActivationPolicy(.accessory)
+        application.activate(ignoringOtherApps: true)
+
+        // Drives PostureMonitor rather than CoreMotion directly: the raw stream
+        // was never the doubtful part, the reference angle and the arithmetic
+        // built on top of it were.
+        let monitor = PostureMonitor()
+        say("Islet posture probe")
+        say("authorization : \(PostureMonitor.authorizationText)")
+        say("supported     : \(monitor.isSupported ? "yes" : "no headphones with motion sensors")")
+        say("calibrated    : \(monitor.isCalibrated ? "yes, from a previous run" : "no, will settle on its own")")
+        say("active app    : \(NSWorkspace.shared.frontmostApplication?.localizedName ?? "unknown")")
+        say("watching for \(Int(seconds))s ...")
+        say("")
+        flush()
+
+        monitor.onSlouch = { minutes in say("  ALERT after \(minutes) min") }
+        monitor.enable()
+
+        let deadline = Date().addingTimeInterval(seconds)
+        var nextReport = Date()
+        while Date() < deadline {
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.2))
+            guard Date() >= nextReport else { continue }
+            nextReport = Date().addingTimeInterval(2)
+            let drop = monitor.drop.map { String(format: "%+.1f°", $0) } ?? "—"
+            say("  \(pad(String(describing: monitor.availability)))"
+                + " calibrated=\(monitor.isCalibrated ? "yes" : "no ")"
+                + "  drop=\(pad(drop, 7))"
+                + "  \(monitor.isSlouching ? "SLOUCHING" : "upright")")
+        }
+        // Read before disabling: stopping clears the live value, and reporting
+        // "never produced a reading" after a screen full of them is worse than
+        // saying nothing.
+        let lastDrop = monitor.drop
+        monitor.disable()
+
+        say("")
+        say("worn today    : \(monitor.wornText)")
+        say("head down     : \(monitor.slouchedText)")
+        say("upright angle : \(String(format: "%.1f°", Preferences.shared.uprightPitch * 180 / .pi)) "
+            + "(\(Preferences.shared.postureCalibrated ? "stored" : "not stored"))")
+
+        if lastDrop == nil {
+            say("")
+            say("Never produced a reading. Either no headphones with motion sensors")
+            say("are connected, or the motion permission is refused.")
+        }
+        flush()
+    }
+
+    private static func pad(_ text: String, _ width: Int = 10) -> String {
+        text.count >= width ? text : text + String(repeating: " ", count: width - text.count)
+    }
+
+
+}

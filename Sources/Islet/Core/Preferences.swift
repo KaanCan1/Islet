@@ -25,6 +25,10 @@ final class Preferences: ObservableObject {
     @Published var postureAlerts: Bool { didSet { store.set(postureAlerts, forKey: "postureAlerts") } }
     /// The head pitch, in radians, recorded as sitting upright.
     @Published var uprightPitch: Double { didSet { store.set(uprightPitch, forKey: "uprightPitch") } }
+    /// Whether `uprightPitch` means anything yet. Zero is not a usable default:
+    /// a head that is level reads around -16 degrees, so measuring from zero
+    /// calls you slouched before you have moved.
+    @Published var postureCalibrated: Bool { didSet { store.set(postureCalibrated, forKey: "postureCalibrated") } }
     @Published var focusMinutes: Int { didSet { store.set(focusMinutes, forKey: "focusMinutes") } }
     @Published var breakMinutes: Int { didSet { store.set(breakMinutes, forKey: "breakMinutes") } }
 
@@ -38,6 +42,7 @@ final class Preferences: ObservableObject {
             "shelfEnabled": true,
             "postureAlerts": false,
             "uprightPitch": 0.0,
+            "postureCalibrated": false,
             "chimeEnabled": true,
             "focusMinutes": 25,
             "breakMinutes": 5
@@ -50,6 +55,7 @@ final class Preferences: ObservableObject {
         shelfEnabled = store.bool(forKey: "shelfEnabled")
         postureAlerts = store.bool(forKey: "postureAlerts")
         uprightPitch = store.double(forKey: "uprightPitch")
+        postureCalibrated = store.bool(forKey: "postureCalibrated")
         chimeEnabled = store.bool(forKey: "chimeEnabled")
         focusMinutes = store.integer(forKey: "focusMinutes")
         breakMinutes = store.integer(forKey: "breakMinutes")

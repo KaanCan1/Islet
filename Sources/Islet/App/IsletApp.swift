@@ -18,6 +18,11 @@ struct IsletApp {
             return
         }
 
+        if CommandLine.arguments.contains("--posture") {
+            PostureProbe.run()
+            return
+        }
+
         let application = NSApplication.shared
         let delegate = AppDelegate()
         application.delegate = delegate

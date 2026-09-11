@@ -10,7 +10,8 @@ struct PosturePanel: View {
     @ObservedObject var posture: PostureMonitor
 
     private var tint: Color {
-        posture.isSlouching
+        guard posture.isCalibrated else { return .white.opacity(0.6) }
+        return posture.isSlouching
             ? Color(red: 1.0, green: 0.72, blue: 0.30)
             : Color(red: 0.35, green: 0.85, blue: 0.45)
     }
@@ -31,18 +32,20 @@ struct PosturePanel: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Image(systemName: posture.isSlouching ? "figure.seated.side" : "figure.stand")
+            Image(systemName: !posture.isCalibrated ? "scope"
+                              : (posture.isSlouching ? "figure.seated.side" : "figure.stand"))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(tint)
                 .contentTransition(.symbolEffect(.replace))
 
-            Text(posture.isSlouching ? "Head down" : "Upright")
+            Text(!posture.isCalibrated ? "Finding upright…"
+                 : (posture.isSlouching ? "Head down" : "Upright"))
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .foregroundStyle(tint)
 
             Spacer(minLength: 0)
 
-            Text("\(Int(drop.rounded()))°")
+            Text(posture.isCalibrated ? "\(Int(drop.rounded()))°" : "—")
                 .font(.system(size: 22, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(0.92))
                 .monospacedDigit()
@@ -94,10 +97,10 @@ struct PosturePanel: View {
             Spacer(minLength: 0)
 
             VStack(alignment: .trailing, spacing: 1) {
-                Text("\(posture.slouchedText) down today")
+                Text(posture.isCalibrated ? "\(posture.slouchedText) down today" : "sit how you mean to sit")
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white.opacity(0.85))
-                Text("of \(posture.wornText) worn")
+                Text(posture.isCalibrated ? "of \(posture.wornText) worn" : "or press Set upright now")
                     .font(.system(size: 9.5, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.42))
             }

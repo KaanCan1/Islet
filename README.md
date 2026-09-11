@@ -92,8 +92,11 @@ quietly. Answer "Not now" and none of it is touched.
   forward of the angle you called upright, which is a decent stand-in for leaning
   into the screen and says nothing at all about your back. Sitting badly with a
   level head reads as fine. It is a nudge, not advice, and certainly not medical
-  advice. Calibration matters: the sensor's zero depends on how the AirPods sit
-  in your ears, so press "Set upright" while sitting how you mean to sit.
+  advice. Everything is measured against a reference angle, because the sensor's
+  own zero is useless: a head that is level reads about -15 degrees, so measuring
+  from zero calls you slouched before you have moved. Islet settles on that
+  reference from your first few seconds of wearing them, which means whatever you
+  were doing then counts as upright — press "Set upright" to fix it properly.
 - Posture needs AirPods Pro, AirPods (3rd generation) or AirPods Max, and it only
   streams head motion while the feature is switched on — it costs AirPods battery,
   which is why it is off by default. The angle has to hold past the threshold for
@@ -123,6 +126,13 @@ quietly. Answer "Not now" and none of it is touched.
   Center → Menu Bar → "Automatically hide and show the menu bar" → Never.
 - `./dist/Islet.app/Contents/MacOS/Islet --diagnose` prints every screen, the
   detected notch size, permission state, and where the Claude figures came from.
+- `Islet --posture` watches the head angle for twelve seconds and prints what it
+  gets, which is the only way to tell a refused permission from absent AirPods
+  from a reference angle that has gone wrong. Launch it through `open` rather
+  than running the binary from a shell: macOS attributes a shell-launched binary
+  to the shell, and CoreMotion has the process killed on the spot. `open
+  ./dist/Islet.app --env ISLET_PROBE_OUT=/tmp/posture.txt --args --posture`
+  writes the report to a file, since a launched app has no terminal to print to.
 
 ## License and notices
 
