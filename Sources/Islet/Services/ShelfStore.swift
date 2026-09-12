@@ -30,6 +30,33 @@ final class ShelfStore: ObservableObject {
 
     var isEmpty: Bool { items.isEmpty }
 
+    private static let storageKey = "shelfItems"
+
+    init() {
+        restore()
+    }
+
+    /// The shelf is a place you left something, so it has to still be there
+    /// after a restart. Only the paths are kept — the files themselves were
+    /// never Islet's — and anything that has since moved is dropped.
+    private func restore() {
+        let paths = UserDefaults.standard.stringArray(forKey: Self.storageKey) ?? []
+        let manager = FileManager.default
+        for path in paths.prefix(Self.capacity) where manager.fileExists(atPath: path) {
+            let url = URL(fileURLWithPath: path)
+            let added = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
+                .contentModificationDate ?? Date()
+            let item = Item(url: url, addedAt: added, thumbnail: nil)
+            items.append(item)
+            loadThumbnail(for: item)
+        }
+        if items.count != paths.count { save() }
+    }
+
+    private func save() {
+        UserDefaults.standard.set(items.map(\.url.path), forKey: Self.storageKey)
+    }
+
     // MARK: - Mutation
 
     func add(_ url: URL) {
@@ -40,20 +67,25 @@ final class ShelfStore: ObservableObject {
         if items.count > Self.capacity { items.removeLast(items.count - Self.capacity) }
 
         loadThumbnail(for: item)
+        save()
     }
 
     func remove(_ item: Item) {
         items.removeAll { $0.id == item.id }
+        save()
     }
 
     func clear() {
         items.removeAll()
+        save()
     }
 
     /// Drops entries whose file is no longer where it was.
     func prune() {
         let manager = FileManager.default
+        let before = items.count
         items.removeAll { !manager.fileExists(atPath: $0.url.path) }
+        if items.count != before { save() }
     }
 
     // MARK: - Actions

@@ -61,6 +61,22 @@ final class Preferences: ObservableObject {
         breakMinutes = store.integer(forKey: "breakMinutes")
     }
 
+    /// Posture's running totals for the current day. Plain accessors rather
+    /// than published properties: they are written every half minute and
+    /// nothing on screen observes them directly.
+    var postureStatsDay: Double {
+        get { store.double(forKey: "postureStatsDay") }
+        set { store.set(newValue, forKey: "postureStatsDay") }
+    }
+    var postureWornSeconds: Double {
+        get { store.double(forKey: "postureWornSeconds") }
+        set { store.set(newValue, forKey: "postureWornSeconds") }
+    }
+    var postureSlouchedSeconds: Double {
+        get { store.double(forKey: "postureSlouchedSeconds") }
+        set { store.set(newValue, forKey: "postureSlouchedSeconds") }
+    }
+
     var launchAtLogin: Bool {
         SMAppService.mainApp.status == .enabled
     }

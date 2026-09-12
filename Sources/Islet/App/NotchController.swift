@@ -92,8 +92,8 @@ final class NotchController {
         }
 
         state.posture.onSlouch = { [weak self] minutes in
-            guard let self, let drop = self.state.posture.drop else { return }
-            self.state.present(.posture(degrees: Int(drop.rounded()), minutes: minutes))
+            guard let self, let drop = self.state.posture.drop else { return false }
+            return self.state.present(.posture(degrees: Int(drop.rounded()), minutes: minutes))
         }
 
         updateClaudeMonitor()

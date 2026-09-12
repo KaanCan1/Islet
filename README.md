@@ -23,7 +23,9 @@ disappear entirely if you don't use Claude Code.
 the panel opens for a few seconds to show it. Click one to open it the way the
 system thumbnail does, or drag it straight out into Finder, a chat or a mail
 draft. macOS draws its own thumbnail in the corner, but you cannot pull a file
-out of it once it has faded; this one keeps the last four until you use them.
+out of it once it has faded; this one keeps the last four until you use them,
+and still has them after a restart — it stores where they are, never a copy, so
+one you move or delete simply drops off.
 
 **Posture** — with AirPods in, how far your head is tipped forward of where you
 calibrated upright, and how much of today has been spent that way. If it stays
@@ -103,7 +105,9 @@ quietly. Answer "Not now" and none of it is touched.
   streams head motion while the feature is switched on — it costs AirPods battery,
   which is why it is off by default. The angle has to hold past the threshold for
   ninety seconds within any three-minute stretch before anything is said, and
-  there is ten minutes of quiet afterwards. Counting across a window rather than
+  there is ten minutes of quiet afterwards. A nudge that arrives while the panel
+  is open is not spent: it waits rather than starting the quiet period on an
+  alert nobody saw. Counting across a window rather than
   demanding one unbroken run is the point: at a desk the angle crosses the line
   constantly and rarely stays over it, so a rule that resets every time you lift
   your head tracks perfectly and never speaks. Glancing at the keyboard still

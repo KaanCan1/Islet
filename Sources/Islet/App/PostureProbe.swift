@@ -63,7 +63,7 @@ enum PostureProbe {
         say("")
         flush()
 
-        monitor.onSlouch = { minutes in say("  ALERT after \(minutes) min") }
+        monitor.onSlouch = { minutes in say("  ALERT after \(minutes) min"); return true }
         monitor.enable()
 
         // The alert path, without waiting out the hold: if a slouch this long

@@ -112,11 +112,16 @@ final class NotchState: ObservableObject {
         return activity == nil ? .collapsed : .activity
     }
 
-    func present(_ new: NotchActivity) {
+    /// Returns whether the alert was actually put on screen. Callers that pay
+    /// for one — posture spends a budget and starts a quiet period — need to
+    /// know, or an alert refused here is simply lost.
+    @discardableResult
+    func present(_ new: NotchActivity) -> Bool {
         // Never interrupt someone who is using the panel.
-        guard !isExpanded, new.isEnabled else { return }
+        guard !isExpanded, new.isEnabled else { return false }
         activity = new
         activityExpiry = Date().addingTimeInterval(new.duration)
+        return true
     }
 
     /// Clears an expired alert; the controller calls this every frame.

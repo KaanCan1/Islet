@@ -56,8 +56,10 @@ final class PostureMonitor: NSObject, ObservableObject {
     @Published private(set) var wornSeconds: TimeInterval = 0
     @Published private(set) var slouchedSeconds: TimeInterval = 0
 
-    /// Fires with the number of minutes the head has been down continuously.
-    var onSlouch: ((Int) -> Void)?
+    /// Fires with the number of minutes spent down. Returns whether the nudge
+    /// reached the screen: one that did not must not spend the budget or start
+    /// the quiet period, or it is lost and the next is ten minutes away.
+    var onSlouch: ((Int) -> Bool)?
 
     /// One processed reading: how long it covered, and whether it was past the
     /// threshold. Readings are throttled to a couple a second, so a full window
@@ -75,6 +77,7 @@ final class PostureMonitor: NSObject, ObservableObject {
     private var lastAlert: Date?
     private var lastSample: Date?
     private var statsDay: Date = Calendar.current.startOfDay(for: Date())
+    private var lastPersist: Date?
     /// AirPods come and go. While the feature is on but nothing is connected,
     /// this keeps looking rather than making you toggle the menu item again.
     private var retry: Timer?
@@ -89,6 +92,26 @@ final class PostureMonitor: NSObject, ObservableObject {
         super.init()
         manager.delegate = self
         isCalibrated = prefs.postureCalibrated
+        restoreTotals()
+    }
+
+    /// The panel says "today", so the totals have to mean the day rather than
+    /// the run. Anything stored under an earlier day is left behind.
+    private func restoreTotals() {
+        let stored = Date(timeIntervalSince1970: prefs.postureStatsDay)
+        guard Calendar.current.isDate(stored, inSameDayAs: statsDay) else { return }
+        wornSeconds = prefs.postureWornSeconds
+        slouchedSeconds = prefs.postureSlouchedSeconds
+    }
+
+    /// Written at most every half minute: the totals move with every sample,
+    /// and none of them is worth a trip to disk on its own.
+    private func persistTotals(_ now: Date = Date(), force: Bool = false) {
+        if !force, let last = lastPersist, now.timeIntervalSince(last) < 30 { return }
+        lastPersist = now
+        prefs.postureStatsDay = statsDay.timeIntervalSince1970
+        prefs.postureWornSeconds = wornSeconds
+        prefs.postureSlouchedSeconds = slouchedSeconds
     }
 
     // MARK: - Lifecycle
@@ -130,6 +153,7 @@ final class PostureMonitor: NSObject, ObservableObject {
     func disable() {
         retry?.invalidate()
         retry = nil
+        persistTotals(force: true)
         stop()
     }
 
@@ -228,6 +252,7 @@ final class PostureMonitor: NSObject, ObservableObject {
             if elapsed <= 2 {
                 wornSeconds += elapsed
                 if degrees >= Self.thresholdDegrees { slouchedSeconds += elapsed }
+                persistTotals(now)
                 updateSlouch(degrees: degrees, elapsed: elapsed, at: now)
             }
         }
@@ -252,11 +277,12 @@ final class PostureMonitor: NSObject, ObservableObject {
         guard down >= Self.budgetSeconds else { return }
         if let last = lastAlert, now.timeIntervalSince(last) < Self.cooldownSeconds { return }
 
+        guard onSlouch?(max(1, Int(down / 60))) == true else { return }
+
         lastAlert = now
         // Spent: the next nudge has to be earned from scratch rather than
         // arriving the moment the quiet period lapses.
         recent.removeAll()
-        onSlouch?(max(1, Int(down / 60)))
     }
 
     /// How close the current window is to earning a nudge, for the panel.
@@ -272,6 +298,7 @@ final class PostureMonitor: NSObject, ObservableObject {
         statsDay = today
         wornSeconds = 0
         slouchedSeconds = 0
+        persistTotals(now, force: true)
     }
 
     // MARK: - Readouts
