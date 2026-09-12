@@ -6,7 +6,9 @@ disappears completely.
 ![Islet in action](docs/demo.gif)
 
 <img src="docs/music.png" width="470" alt="Music panel">
+<img src="docs/shelf.png" width="470" alt="Screenshot shelf">
 <img src="docs/timer.png" width="470" alt="Timer panel">
+<img src="docs/posture.png" width="470" alt="Posture panel">
 <img src="docs/claude.png" width="470" alt="Claude usage panel">
 
 **Music** — now playing from Spotify or Apple Music: large artwork, a scrubbable
