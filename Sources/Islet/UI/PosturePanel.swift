@@ -9,14 +9,21 @@ import SwiftUI
 struct PosturePanel: View {
     @ObservedObject var posture: PostureMonitor
 
+    /// Samples are actually arriving. AirPods report motion only while worn, so
+    /// connected is not the same as tracking, and the panel has to say which.
+    private var isLive: Bool { posture.availability == .tracking }
+
     private var tint: Color {
-        guard posture.isCalibrated else { return .white.opacity(0.6) }
+        guard isLive, posture.isCalibrated else { return .white.opacity(0.6) }
         return posture.isSlouching
             ? Color(red: 1.0, green: 0.72, blue: 0.30)
             : Color(red: 0.35, green: 0.85, blue: 0.45)
     }
 
     private var drop: Double { max(0, posture.drop ?? 0) }
+
+    /// Nothing to fill the track with when no samples are arriving.
+    private var trackFraction: Double { isLive ? min(1, drop / 45) : 0 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -32,20 +39,22 @@ struct PosturePanel: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Image(systemName: !posture.isCalibrated ? "scope"
-                              : (posture.isSlouching ? "figure.seated.side" : "figure.stand"))
+            Image(systemName: !isLive ? "airpods"
+                              : (!posture.isCalibrated ? "scope"
+                                 : (posture.isSlouching ? "figure.seated.side" : "figure.stand")))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(tint)
                 .contentTransition(.symbolEffect(.replace))
 
-            Text(!posture.isCalibrated ? "Finding upright…"
-                 : (posture.isSlouching ? "Head down" : "Upright"))
+            Text(!isLive ? "AirPods idle"
+                 : (!posture.isCalibrated ? "Finding upright…"
+                    : (posture.isSlouching ? "Head down" : "Upright")))
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .foregroundStyle(tint)
 
             Spacer(minLength: 0)
 
-            Text(posture.isCalibrated ? "\(Int(drop.rounded()))°" : "—")
+            Text(isLive && posture.isCalibrated ? "\(Int(drop.rounded()))°" : "—")
                 .font(.system(size: 22, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(0.92))
                 .monospacedDigit()
@@ -60,7 +69,7 @@ struct PosturePanel: View {
     private var angleTrack: some View {
         GeometryReader { geo in
             let span = 45.0
-            let fraction = min(1, drop / span)
+            let fraction = trackFraction
             let mark = PostureMonitor.thresholdDegrees / span
 
             ZStack(alignment: .leading) {
@@ -97,10 +106,12 @@ struct PosturePanel: View {
             Spacer(minLength: 0)
 
             VStack(alignment: .trailing, spacing: 1) {
-                Text(posture.isCalibrated ? "\(posture.slouchedText) down today" : "sit how you mean to sit")
+                Text(!isLive ? "connected, not being worn"
+                     : (posture.isCalibrated ? "\(posture.slouchedText) down today" : "sit how you mean to sit"))
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white.opacity(0.85))
-                Text(posture.isCalibrated ? "of \(posture.wornText) worn" : "or press Set upright now")
+                Text(!isLive ? "put them in and this starts"
+                     : (posture.isCalibrated ? "of \(posture.wornText) worn" : "or press Set upright now"))
                     .font(.system(size: 9.5, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.42))
             }

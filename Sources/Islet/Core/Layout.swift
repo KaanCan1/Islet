@@ -20,7 +20,7 @@ enum Layout {
     static let timerHeight: CGFloat = 108
     static let claudeHeight: CGFloat = 138
     static let shelfHeight: CGFloat = 108
-    static let postureHeight: CGFloat = 116
+    static let postureHeight: CGFloat = 102
 
     /// One screenshot on the shelf. Four of these plus their gaps is what sets
     /// `ShelfStore.capacity`: they have to fit inside `contentWidth` less the

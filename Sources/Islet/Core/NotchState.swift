@@ -80,9 +80,11 @@ final class NotchState: ObservableObject {
     }
 
     /// Posture needs AirPods that report head motion; without them there is
-    /// nothing to show and the tab never appears.
+    /// nothing to show and the tab never appears. Waiting counts as something to
+    /// show: the panel is where it explains that they are connected but idle.
     var showsPosture: Bool {
-        prefs.postureAlerts && posture.availability == .tracking
+        guard prefs.postureAlerts else { return false }
+        return posture.availability == .tracking || posture.availability == .waiting
     }
 
     var visibleTabs: [Tab] {

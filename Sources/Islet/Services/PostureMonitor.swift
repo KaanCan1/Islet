@@ -20,7 +20,13 @@ final class PostureMonitor: NSObject, ObservableObject {
         case unavailable
         /// The motion permission was refused.
         case denied
-        /// Streaming head angle right now.
+        /// The stream is open but nothing is coming through. AirPods report
+        /// motion only while they are being worn, so this is what "connected and
+        /// sitting on the desk" looks like — and it has to be said out loud,
+        /// because a panel that shows a confident 0° while receiving nothing is
+        /// indistinguishable from one that is working.
+        case waiting
+        /// Samples are arriving.
         case tracking
     }
 
@@ -103,9 +109,17 @@ final class PostureMonitor: NSObject, ObservableObject {
     func enable() {
         attach()
         guard retry == nil else { return }
-        let timer = Timer(timeInterval: 20, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 5, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, self.availability != .tracking else { return }
+                guard let self else { return }
+                // Samples stopped without the headphones disconnecting: they are
+                // out of your ears, which is not the same as tracking you.
+                if self.availability == .tracking,
+                   let last = self.lastSample, Date().timeIntervalSince(last) > 6 {
+                    self.availability = .waiting
+                    self.drop = nil
+                }
+                guard self.availability != .tracking else { return }
                 self.attach()
             }
         }
@@ -120,12 +134,9 @@ final class PostureMonitor: NSObject, ObservableObject {
     }
 
     private func attach() {
-        // Already streaming: say so. Returning without this left the panel
-        // believing nothing was connected after AirPods dropped and came back.
-        guard !manager.isDeviceMotionActive else {
-            availability = .tracking
-            return
-        }
+        // Already streaming: leave it be. What the panel says about it is
+        // decided by whether samples arrive, so a reconnect recovers on its own.
+        guard !manager.isDeviceMotionActive else { return }
 
         switch CMHeadphoneMotionManager.authorizationStatus() {
         case .denied, .restricted:
@@ -140,6 +151,9 @@ final class PostureMonitor: NSObject, ObservableObject {
             return
         }
 
+        // Optimism ends here: .tracking is earned by an actual sample, in
+        // consume(), not by the call that opens the stream succeeding.
+        availability = .waiting
         manager.startDeviceMotionUpdates(to: .main) { [weak self] motion, error in
             MainActor.assumeIsolated {
                 guard let self else { return }
@@ -152,7 +166,6 @@ final class PostureMonitor: NSObject, ObservableObject {
                 self.consume(motion)
             }
         }
-        availability = .tracking
     }
 
     private func stop() {
@@ -191,6 +204,7 @@ final class PostureMonitor: NSObject, ObservableObject {
         if let last = lastProcessed, now.timeIntervalSince(last) < 0.4 { return }
         lastProcessed = now
 
+        if availability != .tracking { availability = .tracking }
         rolloverIfNeeded(now)
 
         // No reference angle yet: gather a few seconds and take the middle of
