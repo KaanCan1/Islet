@@ -200,9 +200,10 @@ It is a shipped preset remixed onto Islet's own tokens, taken from the app's
 source rather than invented: the panel's `#000000` is the ink, the app's orange
 `#FF9500` is the accent, and the ground is the `#F7F5F2` the screen recorder lays
 down. That is why the ring around a shelf tile in the video is the same orange as
-the timer in the thumbnail inside it. The frontmatter is the normative layer —
-the frames read their palette straight out of it, so there is no second copy to
-drift. One token is the video's own: `#FF9500` is a fill colour on a black panel
+the timer in the thumbnail inside it. The frontmatter is the normative layer, so
+the frames are written from it: `tools/build-frames.py` reads the palette out of
+`frame.md` and regenerates all eight compositions, which is also what keeps the
+promise that frames 3 to 7 are one layout with a single measurement moved. One token is the video's own: `#FF9500` is a fill colour on a black panel
 and too light to set type on cream, so glyphs and words use `coral-ink`
 `#B86B00`, the same hue taken dark enough to read.
 
