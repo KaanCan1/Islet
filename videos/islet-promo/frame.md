@@ -12,13 +12,18 @@ unit: the frame — 1920×1080 primary; 9:16 and 1:1 documented
 principle: atoms are sacred · composition is free · numbers come from the script
 
 colors:
-  ink: "#141413"
-  cream: "#F7F5F2"   # the exact cream the screen recording carries, so footage can run full-bleed with no seam
-  tile: "#EFE9DE"
-  tile-strong: "#ECE3D4"
-  coral: "#CC785C"
+  ink: "#000000"
+  cream: "#F7F5F2"
+  tile: "#FFEBCE"
+  tile-strong: "#FFB84D"
+  coral: "#FF9500"
+  # Islet's orange is a fill colour: at 28px on the cream ground it reads 2.02:1,
+  # under the 3:1 floor, so it can carry a ring, a rule or a band but must not set
+  # type. This is the same hue and saturation taken to 36% lightness — 3.75:1 —
+  # and it is what every coral GLYPH or coral WORD uses.
+  coral-ink: "#B86B00"
   navy: "#181715"
-  navy-soft: "#1F1E1B"
+  navy-soft: "#1F1D1B"
   navy-elev: "#252320"
 
 borders: { hairline: "1px solid ink@12%", hairline-strong: "1px solid ink@20%", dark: "1px solid cream@14% (on navy)" }
@@ -92,6 +97,13 @@ components:
 
 # Code editorial — Frame (video / frame layer)
 
+## Brand adaptation (READ FIRST — the frontmatter is the source of truth)
+
+This is the **code-editorial** preset remixed onto the captured brand. The YAML frontmatter above (colors · typography · components) is **normative and already correct — use it verbatim.** The prose below is the ORIGINAL preset's intent; read it THROUGH the frontmatter:
+
+- **Colors** — use the frontmatter hex; preset color NAMES in prose (e.g. "cobalt", "cream") mean the remapped brand values.
+
+
 ## Overview
 
 Code editorial at frame scale is a **warm-editorial brand book come to life** — the register of a literary
@@ -115,6 +127,7 @@ label reads as a different brand.
 - **EB Garamond** (sentence case, negative-tracked) for all display; **Inter** body/chrome; **JetBrains Mono** index + code.
 - **Hairline elevation** — a 1px low-alpha ink border + at most one soft warm shadow. No heavy drop, glow, or gradient.
 - **Coral is rationed** — at most ONE coral moment per frame (CTA, inline link, OR full-bleed band); coral never sets a headline or a body run.
+- **Coral fills, `coral-ink` letters.** The brand orange is a surface colour on a black panel; on the cream ground it is too light to be read as type. Rings, rules and bands take `coral`; the ✱ spike and any coral word take `coral-ink`.
 - **Density is free** — fill the frame as the content wants; a frame may stand on a single focal or carry a dense, layered composition.
 - **The ✱ coral spike** opens kickers; warm navy is reserved for the code/terminal surface.
 

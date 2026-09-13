@@ -198,11 +198,19 @@ needs to.
 
 ## Video direction
 
-**Ground.** One colour under everything: cream `#F7F5F2`. This is not the
-preset's stock cream — it is the exact value the screen recording carries, so
-the two footage frames meet the page with no visible rectangle. Ink `#141413`
-is the voice. Coral `#CC785C` appears **at most once per frame** and never sets
-a headline or a body run.
+**Ground.** The palette is not the frame preset's. `frame.md` is the preset
+remixed onto Islet's own tokens — the panel's black `#000000` as the ink, the
+app's orange `#FF9500` as the accent — so the video is built out of the product's
+colours rather than beside them. The one value that is the video's own is the
+cream `#F7F5F2`: it is exactly what the screen recording carries, so the two
+footage frames meet the page with no visible rectangle, and the recorder lays
+that same cream down as its backdrop.
+
+**Coral fills, `coral-ink` letters.** `#FF9500` is a surface colour on a black
+panel; on cream it reads 2.02:1, under the legibility floor, so it takes rings,
+rules and bands only. Every coral glyph and coral word uses `coral-ink`
+`#B86B00` — the same hue and saturation at 36% lightness, 3.75:1. Coral appears
+**at most once per frame** and never sets a headline or a body run.
 
 **The footage rect is load-bearing and identical in Frames 1 and 8:**
 `x:0 y:400 w:1920 h:680`, `object-fit: cover`. The assembler hoists an approved

@@ -194,6 +194,18 @@ The promo itself is a [HyperFrames](https://hyperframes.heygen.com) project in
 `videos/islet-promo/`; `npm run check` validates it and `npm run render` produces
 `docs/demo.mp4`.
 
+Its design system is `videos/islet-promo/frame.md` — a frame-scale spec, which is
+what a `design.md` becomes once the unit is a 1920x1080 frame instead of a page.
+It is a shipped preset remixed onto Islet's own tokens, taken from the app's
+source rather than invented: the panel's `#000000` is the ink, the app's orange
+`#FF9500` is the accent, and the ground is the `#F7F5F2` the screen recorder lays
+down. That is why the ring around a shelf tile in the video is the same orange as
+the timer in the thumbnail inside it. The frontmatter is the normative layer —
+the frames read their palette straight out of it, so there is no second copy to
+drift. One token is the video's own: `#FF9500` is a fill colour on a black panel
+and too light to set type on cream, so glyphs and words use `coral-ink`
+`#B86B00`, the same hue taken dark enough to read.
+
 ## License and notices
 
 The code is MIT licensed — see [LICENSE](LICENSE). Do what you like with it.
