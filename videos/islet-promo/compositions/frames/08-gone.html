@@ -1,0 +1,61 @@
+<template>
+  <style>
+    @font-face{font-family:"EB Garamond";src:url("assets/fonts/EBGaramond-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+    @font-face{font-family:"Inter";src:url("assets/fonts/Inter-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+    @font-face{font-family:"JetBrains Mono";src:url("assets/fonts/JetBrainsMono-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+    @font-face{font-family:"JetBrains Mono";src:url("assets/fonts/JetBrainsMono-700.woff2") format("woff2");font-weight:700;font-style:normal;font-display:block}
+
+    /* The frame ground is a clip layer, never the root: at assembly the root is
+       gated to this frame's window, so a background painted on it is not a
+       dependable full-frame ground. */
+    #root{position:absolute;inset:0;overflow:hidden;container-type:size}
+
+    .f08-ground{position:absolute;inset:0;background:#F7F5F2}
+    .f08-stage{position:absolute;inset:0}
+
+    .f08-kicker{
+      position:absolute;font-family:"JetBrains Mono","Courier New",monospace;font-weight:500;
+      font-size:28px;letter-spacing:.16em;text-transform:uppercase;color:rgba(20,20,19,.55);
+      white-space:nowrap;
+    }
+    .f08-kicker .f08-spike{color:#CC785C;margin-right:.62em}
+
+    .f08-display{
+      position:absolute;font-family:"EB Garamond","Times New Roman",serif;font-weight:400;
+      color:#141413;
+    }
+
+    #f08-kicker{left:120px;top:100px}
+    #f08-line{left:120px;top:160px;width:1680px;font-size:128px;line-height:1.02;letter-spacing:-.022em}
+    #f08-url{position:absolute;left:120px;top:296px;font-family:"JetBrains Mono","Courier New",monospace;font-weight:500;font-size:38px;letter-spacing:.01em;color:#CC785C}
+    #f08-urlrule{position:absolute;left:120px;top:354px;width:680px;height:1px;background:#CC785C;transform-origin:0 50%}
+  </style>
+
+  <div id="root" data-composition-id="08-gone" data-width="1920" data-height="1080">
+    <div id="f08-ground" class="clip f08-ground" data-start="0" data-duration="5.6" data-track-index="0"></div>
+    <div id="f08-stage" class="clip f08-stage" data-start="0" data-duration="5.6" data-track-index="1">
+      <div class="f08-kicker" id="f08-kicker" data-layout-allow-overlap><span class="f08-spike" data-layout-allow-overlap>&#10033;</span>move away</div>
+      <div class="f08-display" id="f08-line" data-layout-allow-overlap>And it&rsquo;s gone.</div>
+      <div id="f08-url">github.com/KaanCan1/Islet</div>
+      <div id="f08-urlrule"></div>
+      <!-- approved frame video hoisted by assemble-index -->
+    </div>
+  </div>
+
+  <script>
+    window.__timelines = window.__timelines || {};
+    (function () {
+      var tl = gsap.timeline({ paused: true });
+      tl.fromTo("#f08-kicker", { opacity: 0, y: 16 },
+        { opacity: 1, y: 0, duration: 0.70, ease: "power2.out" }, 0.30);
+      tl.fromTo("#f08-line", { opacity: 0, y: 22 },
+        { opacity: 1, y: 0, duration: 0.80, ease: "power3.out" }, 2.20);
+      tl.fromTo("#f08-url", { opacity: 0, y: 12 },
+        { opacity: 1, y: 0, duration: 0.65, ease: "power3.out" }, 3.60);
+      tl.fromTo("#f08-urlrule", { opacity: 1, scaleX: 0 },
+        { scaleX: 1, duration: 0.55, ease: "power2.inOut" }, 3.70);
+      tl.to({}, { duration: 5.6 }, 0);
+      window.__timelines["08-gone"] = tl;
+    })();
+  </script>
+</template>

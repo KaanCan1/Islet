@@ -1,0 +1,64 @@
+<template>
+  <style>
+    @font-face{font-family:"EB Garamond";src:url("assets/fonts/EBGaramond-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+    @font-face{font-family:"Inter";src:url("assets/fonts/Inter-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+    @font-face{font-family:"JetBrains Mono";src:url("assets/fonts/JetBrainsMono-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+    @font-face{font-family:"JetBrains Mono";src:url("assets/fonts/JetBrainsMono-700.woff2") format("woff2");font-weight:700;font-style:normal;font-display:block}
+
+    /* The frame ground is a clip layer, never the root: at assembly the root is
+       gated to this frame's window, so a background painted on it is not a
+       dependable full-frame ground. */
+    #root{position:absolute;inset:0;overflow:hidden;container-type:size}
+
+    .f04-ground{position:absolute;inset:0;background:#F7F5F2}
+    .f04-stage{position:absolute;inset:0}
+
+    .f04-kicker{
+      position:absolute;font-family:"JetBrains Mono","Courier New",monospace;font-weight:500;
+      font-size:28px;letter-spacing:.16em;text-transform:uppercase;color:rgba(20,20,19,.55);
+      white-space:nowrap;
+    }
+    .f04-kicker .f04-spike{color:#CC785C;margin-right:.62em}
+
+    .f04-display{
+      position:absolute;font-family:"EB Garamond","Times New Roman",serif;font-weight:400;
+      color:#141413;
+    }
+
+    #f04-kicker{left:120px;top:152px}
+    #f04-headline{left:120px;top:208px;width:1680px;font-size:88px;line-height:1.06;letter-spacing:-.018em}
+    #f04-panel{position:absolute;left:360px;top:348px;width:1200px;height:434px;display:block}
+    #f04-sub{position:absolute;left:360px;top:830px;width:1200px;font-family:"Inter",system-ui,sans-serif;font-weight:400;font-size:34px;line-height:1.45;color:rgba(20,20,19,.68)}
+    #f04-ring{position:absolute;left:851px;top:486px;width:217px;height:134px;border:2px solid #CC785C;border-radius:10px;box-sizing:border-box}
+  </style>
+
+  <div id="root" data-composition-id="04-shelf" data-width="1920" data-height="1080" data-duration="4.7">
+    <div id="f04-ground" class="clip f04-ground" data-start="0" data-duration="4.7" data-track-index="0"></div>
+    <div id="f04-stage" class="clip f04-stage" data-start="0" data-duration="4.7" data-track-index="1">
+      <div class="f04-kicker" id="f04-kicker" data-layout-allow-overlap><span class="f04-spike" data-layout-allow-overlap>&#10033;</span>Shelf</div>
+      <div class="f04-display" id="f04-headline" data-layout-allow-overlap>Every screenshot lands here.</div>
+      <img id="f04-panel" src="assets/shelf.png" alt="">
+      <div id="f04-sub">Click one to open it. Drag it straight into Finder, a chat, a mail draft.</div>
+      <div id="f04-ring"></div>
+    </div>
+  </div>
+
+  <script>
+    window.__timelines = window.__timelines || {};
+    (function () {
+      var tl = gsap.timeline({ paused: true });
+      tl.fromTo("#f04-kicker", { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.60, ease: "power2.out" }, 0);
+      tl.fromTo("#f04-headline", { opacity: 0, y: 22 },
+        { opacity: 1, y: 0, duration: 0.82, ease: "power3.out" }, 0.10);
+      tl.fromTo("#f04-panel", { opacity: 0, y: 30 },
+        { opacity: 1, y: 0, duration: 0.87, ease: "power3.out" }, 0.25);
+      tl.fromTo("#f04-sub", { opacity: 0, y: 12 },
+        { opacity: 1, y: 0, duration: 0.70, ease: "power3.out" }, 1.25);
+      tl.fromTo("#f04-ring", { opacity: 0, scale: 1.06 },
+        { opacity: 1, scale: 1, duration: 0.75, ease: "power2.out" }, 1.55);
+      tl.to({}, { duration: 4.2 }, 0);
+      window.__timelines["04-shelf"] = tl;
+    })();
+  </script>
+</template>

@@ -1,0 +1,61 @@
+<template>
+  <style>
+    @font-face{font-family:"EB Garamond";src:url("assets/fonts/EBGaramond-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+    @font-face{font-family:"Inter";src:url("assets/fonts/Inter-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+    @font-face{font-family:"JetBrains Mono";src:url("assets/fonts/JetBrainsMono-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+    @font-face{font-family:"JetBrains Mono";src:url("assets/fonts/JetBrainsMono-700.woff2") format("woff2");font-weight:700;font-style:normal;font-display:block}
+
+    /* The frame ground is a clip layer, never the root: at assembly the root is
+       gated to this frame's window, so a background painted on it is not a
+       dependable full-frame ground. */
+    #root{position:absolute;inset:0;overflow:hidden;container-type:size}
+
+    .f07-ground{position:absolute;inset:0;background:#F7F5F2}
+    .f07-stage{position:absolute;inset:0}
+
+    .f07-kicker{
+      position:absolute;font-family:"JetBrains Mono","Courier New",monospace;font-weight:500;
+      font-size:28px;letter-spacing:.16em;text-transform:uppercase;color:rgba(20,20,19,.55);
+      white-space:nowrap;
+    }
+    .f07-kicker .f07-spike{color:#CC785C;margin-right:.62em}
+
+    .f07-display{
+      position:absolute;font-family:"EB Garamond","Times New Roman",serif;font-weight:400;
+      color:#141413;
+    }
+
+    #f07-kicker{left:120px;top:152px}
+    #f07-headline{left:120px;top:208px;width:1680px;font-size:88px;line-height:1.06;letter-spacing:-.018em}
+    #f07-panel{position:absolute;left:360px;top:370px;width:1200px;height:523px;display:block}
+    #f07-sub{position:absolute;left:360px;top:830px;width:1200px;font-family:"Inter",system-ui,sans-serif;font-weight:400;font-size:34px;line-height:1.45;color:rgba(20,20,19,.68)}
+    #f07-note{position:absolute;left:1000px;top:152px;width:800px;text-align:right;font-family:"JetBrains Mono","Courier New",monospace;font-weight:500;font-size:24px;letter-spacing:.14em;text-transform:uppercase;color:rgba(20,20,19,.55)}
+  </style>
+
+  <div id="root" data-composition-id="07-claude" data-width="1920" data-height="1080" data-duration="4.5">
+    <div id="f07-ground" class="clip f07-ground" data-start="0" data-duration="4.5" data-track-index="0"></div>
+    <div id="f07-stage" class="clip f07-stage" data-start="0" data-duration="4.5" data-track-index="1">
+      <div class="f07-kicker" id="f07-kicker" data-layout-allow-overlap><span class="f07-spike" data-layout-allow-overlap>&#10033;</span>Claude Code</div>
+      <div class="f07-display" id="f07-headline" data-layout-allow-overlap>How much of the five-hour block is gone.</div>
+      <img id="f07-panel" src="assets/claude.png" alt="">
+      <div id="f07-note">tab disappears if you don&rsquo;t use it</div>
+    </div>
+  </div>
+
+  <script>
+    window.__timelines = window.__timelines || {};
+    (function () {
+      var tl = gsap.timeline({ paused: true });
+      tl.fromTo("#f07-kicker", { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.60, ease: "power2.out" }, 0);
+      tl.fromTo("#f07-headline", { opacity: 0, y: 22 },
+        { opacity: 1, y: 0, duration: 0.82, ease: "power3.out" }, 0.10);
+      tl.fromTo("#f07-panel", { opacity: 0, y: 30 },
+        { opacity: 1, y: 0, duration: 0.87, ease: "power3.out" }, 0.25);
+      tl.fromTo("#f07-note", { opacity: 0 },
+        { opacity: 1, duration: 0.55, ease: "power2.out" }, 0.15);
+      tl.to({}, { duration: 4 }, 0);
+      window.__timelines["07-claude"] = tl;
+    })();
+  </script>
+</template>

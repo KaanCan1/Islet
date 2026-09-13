@@ -8,20 +8,33 @@ private let scanHorizon: TimeInterval = 30 * 86400
 
 /// Usage measured over one rate-limit window.
 ///
-/// Measured as time rather than tokens. Nothing on disk says what Claude counts,
-/// so it was worked out from the moments this account was actually cut off:
-/// across those, the tokens standing in the window varied by a factor of 3.5
-/// (1.2M to 4.3M) while the minutes spent varied far less. Checked against a
-/// figure read out of Claude Code's own /usage, the time measure predicted 85%
-/// where the truth was 77%; the token measure was out by up to 2x.
+/// Measured in tokens against a ceiling learned from the moments this account
+/// was actually cut off. Nothing on disk says what Claude counts, so the only
+/// way to choose between the candidate measures is to replay the rejections
+/// this machine has recorded and ask which one would have read 100% at the
+/// moment the account was refused.
+///
+/// Against fourteen rejections, scoring each one using only the rejections
+/// before it, the mean error at the moment of cut-off was:
+///
+///     minutes, largest   42pp      tokens, largest   50pp
+///     minutes, median    33pp      tokens, median    21pp
+///
+/// So this counts tokens, and takes the median rather than the largest. The
+/// largest was the worse half of an earlier guess: it is set by the one window
+/// that ran furthest before Claude objected, so every other window reads low —
+/// on this account the panel showed 12% at a moment it had just been cut off.
+/// Minutes were chosen when the rejections here spread over 1.8x; they now
+/// spread over 8.4x (11 to 92), which is what broke the measure.
 struct ClaudeWindow: Equatable {
-    /// Seconds in which at least one request was made.
+    /// Seconds in which at least one request was made. Shown as "of use"
+    /// because it is legible, but the percentage does not come from it.
     var usageSeconds: Int
     var tokens: Int
-    /// Ceiling in seconds, from the moments this account was rate limited.
-    /// Nil when no rejection has been recorded, or when the evidence has gone
-    /// stale — being over it without being cut off proves it wrong.
-    var ceilingSeconds: Int?
+    /// Ceiling in tokens, the median of the amounts standing in the window at
+    /// each moment this account was rate limited. Nil until two of those have
+    /// been recorded — one is an anecdote, not a ceiling.
+    var ceilingTokens: Int?
     var resetsAt: Date?
     var limitReached: Bool
     var length: TimeInterval = fiveHourWindow
@@ -33,8 +46,8 @@ struct ClaudeWindow: Equatable {
 
     var percent: Double? {
         if let exactPercent { return exactPercent }
-        guard let ceilingSeconds, ceilingSeconds > 0 else { return nil }
-        return min(Double(usageSeconds) / Double(ceilingSeconds), 1)
+        guard let ceilingTokens, ceilingTokens > 0 else { return nil }
+        return min(Double(tokens) / Double(ceilingTokens), 1)
     }
 
     var percentText: String? {
@@ -47,13 +60,15 @@ struct ClaudeWindow: Equatable {
     }
 
     var usageText: String { Self.duration(usageSeconds) }
-    var ceilingText: String? { ceilingSeconds.map { "~" + Self.duration($0) } }
 
-    var tokensText: String {
-        if tokens >= 1_000_000 { return String(format: "%.1fM", Double(tokens) / 1_000_000) }
-        if tokens >= 1_000 { return "\(tokens / 1_000)K" }
-        return "\(tokens)"
+    static func count(_ value: Int) -> String {
+        if value >= 1_000_000 { return String(format: "%.1fM", Double(value) / 1_000_000) }
+        if value >= 1_000 { return "\(value / 1_000)K" }
+        return "\(value)"
     }
+
+    var tokensText: String { Self.count(tokens) }
+    var ceilingText: String? { ceilingTokens.map { "~" + Self.count($0) + " tokens" } }
 
     var remainingText: String {
         guard let resetsAt else { return "no reset recorded" }
@@ -118,13 +133,30 @@ final class ClaudeUsageMonitor: ObservableObject {
     func stop() {
         timer?.invalidate()
         timer = nil
+        pass?.cancel()
+        pass = nil
     }
 
+    /// The pass in flight, if any. `isScanning` cannot stand in for it: that goes
+    /// false as soon as the local numbers are ready, while the fetch behind it is
+    /// still running, so guarding on it let a second pass start on top of the
+    /// first — and let a forced refresh be thrown away mid-pass.
+    private var pass: Task<Void, Never>?
+    /// A press that landed while a pass was running. Remembered rather than
+    /// dropped: the button used to clear the fetch interval and return, so the
+    /// press did nothing at all and the panel looked stuck.
+    private var forceQueued = false
+
     /// Rescans now. Runs on a timer every minute; the button forces it early.
-    func refresh() {
-        guard !isScanning else { return }
+    func refresh(force: Bool = false) {
+        if force { lastFetch = nil }
+        guard pass == nil else {
+            if force { forceQueued = true }
+            return
+        }
         isScanning = true
-        Task {
+        pass = Task { [weak self] in
+            guard let self else { return }
             // Local numbers first. Reading the keychain can sit behind a macOS
             // permission prompt for as long as nobody answers it, and that must
             // never be what stops the panel from showing anything.
@@ -134,14 +166,16 @@ final class ClaudeUsageMonitor: ObservableObject {
             if await fetchIfDue() {
                 snapshot = await summarise(with: reading)
             }
+            pass = nil
+            if forceQueued {
+                forceQueued = false
+                refresh(force: true)
+            }
         }
     }
 
     /// Bypasses the fetch interval, for the refresh button.
-    func refreshNow() {
-        lastFetch = nil
-        refresh()
-    }
+    func refreshNow() { refresh(force: true) }
 
     private func summarise(with api: ClaudeUsageAPI.Reading?) async -> Snapshot? {
         await withCheckedContinuation { continuation in
@@ -444,17 +478,18 @@ private final class Store: @unchecked Sendable {
     private func window(from start: TimeInterval, to end: TimeInterval, length: TimeInterval,
                         resetsAt: Date?, type: String, exact: ClaudeUsageAPI.Window?) -> ClaudeWindow {
         let used = usageSeconds(from: start, to: end)
+        let spent = tokens(from: start, to: end)
         let rejected = isRejected(type, now: Date())
         var ceiling = estimatedCeiling(for: type, window: length)
         // Running past the ceiling without being cut off proves it too low, so
         // raise it. That is what keeps this honest as limits move: a promo or a
         // plan change works itself in without anyone typing a number.
-        if let value = ceiling, used > value, !rejected { ceiling = used }
+        if let value = ceiling, spent > value, !rejected { ceiling = spent }
 
         return ClaudeWindow(
             usageSeconds: used,
-            tokens: tokens(from: start, to: end),
-            ceilingSeconds: ceiling,
+            tokens: spent,
+            ceilingTokens: ceiling,
             // The server's own reset time when we have it: the local one is
             // inferred from the first request seen and can sit minutes out.
             resetsAt: exact?.resetsAt ?? resetsAt,
@@ -482,15 +517,16 @@ private final class Store: @unchecked Sendable {
         return total
     }
 
-    /// The ceiling, in seconds, from the moments this account was rate limited:
-    /// the usage standing in the window at each, taking the largest.
+    /// The ceiling, in tokens, from the moments this account was rate limited:
+    /// the amount standing in the window at each, taking the median.
     ///
-    /// The largest, not the median, because the measure and whatever Claude
-    /// actually counts do not line up exactly — the four rejections here landed
-    /// at 50, 64, 88 and 89 minutes. Checked against a figure read out of Claude
-    /// Code's own /usage, the largest predicted 72% where the truth was 77%; the
-    /// median said 85%. It also cannot report over 100% before a cut-off, which
-    /// the median could.
+    /// The median, not the largest. The largest is by definition the one window
+    /// that ran furthest before Claude objected, so it sets a ceiling no other
+    /// window reaches and every reading comes out low — replayed over the
+    /// rejections recorded here it was 21 points worse at the moment of
+    /// cut-off than the median (see ClaudeWindow). It cannot report over 100%
+    /// before a cut-off, which the median can; being told 100% a little early
+    /// is the better failure, because the point of the number is to warn.
     private func estimatedCeiling(for type: String, window: TimeInterval) -> Int? {
         var values: [Int] = []
         var lastBlock: TimeInterval = -1
@@ -500,14 +536,19 @@ private final class Store: @unchecked Sendable {
             // Several rejections in one window describe the same moment.
             guard start != lastBlock else { continue }
             lastBlock = start
-            let used = usageSeconds(from: start, to: end)
-            if used > 0 { values.append(used) }
+            let spent = tokens(from: start, to: end)
+            if spent > 0 { values.append(spent) }
         }
         // One rejection is an anecdote, not a ceiling. The single seven-day
         // rejection on this machine predates a "+50% weekly limits" promo and
         // would have reported 99% where the truth was 33%; two agreeing
         // observations are the least that can be stood behind.
-        return values.count >= 2 ? values.max() : nil
+        guard values.count >= 2 else { return nil }
+        let sorted = values.sorted()
+        let middle = sorted.count / 2
+        return sorted.count.isMultiple(of: 2)
+            ? (sorted[middle - 1] + sorted[middle]) / 2
+            : sorted[middle]
     }
 
     private func blockStart(containing moment: TimeInterval) -> TimeInterval {

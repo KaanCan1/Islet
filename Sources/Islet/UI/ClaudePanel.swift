@@ -19,11 +19,11 @@ struct ClaudePanel: View {
         return "updated " + formatter.string(from: updated)
     }
 
-    /// Measured as time spent, not tokens: see ClaudeWindow for why.
+    /// Measured in tokens against a learned ceiling: see ClaudeWindow for why.
     private func footnote(for snapshot: ClaudeUsageMonitor.Snapshot) -> String {
         if snapshot.fiveHour.isExact { return "figures from Claude's usage API" }
         if let failure = claude.apiFailure { return "estimated — " + failure.explanation }
-        if snapshot.fiveHour.ceilingSeconds == nil && snapshot.sevenDay.ceilingSeconds == nil {
+        if snapshot.fiveHour.ceilingTokens == nil && snapshot.sevenDay.ceilingTokens == nil {
             return "estimated — no ceiling learned yet"
         }
         return "estimated from when Claude Code last cut you off"
@@ -121,11 +121,15 @@ private struct WindowRow: View {
         if window.limitReached {
             return "rate limited · resets in " + window.remainingText
         }
-        var text = window.usageText
-        // The learned ceiling only explains the percentage while we are guessing
-        // at it. Printing it next to an exact figure just contradicts it.
-        if !window.isExact, let ceiling = window.ceilingText { text += " of \(ceiling)" }
-        text += " of use"
+        // Tokens are what the percentage is measured against, so they are what
+        // belongs beside it; the minutes are here because they read as effort.
+        // The learned ceiling itself is not printed — it is a guess with a wide
+        // spread, and putting a number on it made it look like a quoted limit.
+        // With no percentage the row's own figure is already the duration, so
+        // repeating it here would print the same thing twice.
+        var text = window.percentText == nil
+            ? "\(window.tokensText) tokens"
+            : "\(window.tokensText) tokens in \(window.usageText)"
         if window.resetsAt != nil { text += " · resets in " + window.remainingText }
         return text
     }

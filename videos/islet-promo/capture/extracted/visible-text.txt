@@ -1,0 +1,31 @@
+Islet — README, verbatim.
+
+Hover your MacBook's camera notch and it grows into a panel. Move away and it
+disappears completely.
+
+Music — now playing from Spotify or Apple Music: large artwork, a scrubbable
+progress bar and transport controls. Click the artwork to jump to the app it is
+playing in.
+
+Claude — how much of the current Claude Code five-hour block you have spent,
+beside the transport. Click it for the weekly window too. The column and its tab
+disappear entirely if you don't use Claude Code.
+
+Shelf — every screenshot you take lands here the moment it is written, and the
+panel opens for a few seconds to show it. Click one to open it the way the system
+thumbnail does, or drag it straight out into Finder, a chat or a mail draft.
+macOS draws its own thumbnail in the corner, but you cannot pull a file out of it
+once it has faded; this one keeps the last four until you use them, and still has
+them after a restart.
+
+Posture — with AirPods in, how far your head is tipped forward of where you
+calibrated upright, and how much of today has been spent that way. If it stays
+down for a few minutes, the notch says so once and then leaves you alone.
+
+Timer — a pomodoro with Focus and Break modes. Plus battery alerts when the
+charger goes in or out, and an option to stay visible on the lock screen.
+
+Install: needs macOS 14+ and the Xcode Command Line Tools.
+git clone https://github.com/KaanCan1/Islet.git
+
+Licence: MIT. One author. Free.

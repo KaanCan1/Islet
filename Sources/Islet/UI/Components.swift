@@ -1,5 +1,14 @@
 import SwiftUI
 
+// MARK: - Capture mode
+
+/// Documentation captures need a still frame. Anything that animates on its own
+/// — a scrolling title, a rolling digit — is smeared by whatever instant the
+/// shutter lands on, so ISLET_DEMO holds those at their settled value.
+enum Capture {
+    static let pinned = ProcessInfo.processInfo.environment["ISLET_DEMO"] != nil
+}
+
 // MARK: - Icon button
 
 struct IconButton: View {
@@ -215,10 +224,6 @@ struct MarqueeText: View {
 
     @State private var offset: CGFloat = 0
 
-    /// Documentation captures need a stable frame, so ISLET_DEMO pins the text
-    /// at the start instead of catching it mid-scroll.
-    private static let pinned = ProcessInfo.processInfo.environment["ISLET_DEMO"] != nil
-
     var body: some View {
         GeometryReader { geo in
             let overflow = max(0, textWidth - geo.size.width)
@@ -232,7 +237,7 @@ struct MarqueeText: View {
                 .clipped()
                 .task(id: "\(text)|\(Int(geo.size.width))") {
                     offset = 0
-                    guard overflow > 6, !Self.pinned else { return }
+                    guard overflow > 6, !Capture.pinned else { return }
                     withAnimation(
                         .linear(duration: Double(overflow) / 22)
                         .delay(1.6)

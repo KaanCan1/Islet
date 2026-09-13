@@ -1,0 +1,58 @@
+<template>
+  <style>
+    @font-face{font-family:"EB Garamond";src:url("assets/fonts/EBGaramond-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+    @font-face{font-family:"Inter";src:url("assets/fonts/Inter-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+    @font-face{font-family:"JetBrains Mono";src:url("assets/fonts/JetBrainsMono-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+    @font-face{font-family:"JetBrains Mono";src:url("assets/fonts/JetBrainsMono-700.woff2") format("woff2");font-weight:700;font-style:normal;font-display:block}
+
+    /* The frame ground is a clip layer, never the root: at assembly the root is
+       gated to this frame's window, so a background painted on it is not a
+       dependable full-frame ground. */
+    #root{position:absolute;inset:0;overflow:hidden;container-type:size}
+
+    .f01-ground{position:absolute;inset:0;background:#F7F5F2}
+    .f01-stage{position:absolute;inset:0}
+
+    .f01-kicker{
+      position:absolute;font-family:"JetBrains Mono","Courier New",monospace;font-weight:500;
+      font-size:28px;letter-spacing:.16em;text-transform:uppercase;color:rgba(20,20,19,.55);
+      white-space:nowrap;
+    }
+    .f01-kicker .f01-spike{color:#CC785C;margin-right:.62em}
+
+    .f01-display{
+      position:absolute;font-family:"EB Garamond","Times New Roman",serif;font-weight:400;
+      color:#141413;
+    }
+
+    .f01-line{left:120px;width:1680px;font-size:96px;line-height:1.04;letter-spacing:-.018em}
+    #f01-line1{top:160px}
+    #f01-line2{top:262px}
+    #f01-kicker{left:120px;top:100px}
+  </style>
+
+  <div id="root" data-composition-id="01-hover" data-width="1920" data-height="1080" data-duration="4.5">
+    <div id="f01-ground" class="clip f01-ground" data-start="0" data-duration="4.5" data-track-index="0"></div>
+    <div id="f01-stage" class="clip f01-stage" data-start="0" data-duration="4.5" data-track-index="1">
+      <div class="f01-kicker f01-chrome" id="f01-kicker" data-layout-allow-overlap><span class="f01-spike" data-layout-allow-overlap>&#10033;</span>macOS &middot; the camera notch</div>
+      <div class="f01-display f01-line" id="f01-line1" data-layout-allow-overlap>Hover the notch.</div>
+      <div class="f01-display f01-line" id="f01-line2" data-layout-allow-overlap>It becomes a panel.</div>
+      <!-- approved frame video hoisted by assemble-index -->
+    </div>
+  </div>
+
+  <script>
+    window.__timelines = window.__timelines || {};
+    (function () {
+      var tl = gsap.timeline({ paused: true });
+      tl.fromTo("#f01-kicker", { opacity: 0, y: 16 },
+        { opacity: 1, y: 0, duration: 0.60, ease: "power2.out" }, 0.15);
+      tl.fromTo("#f01-line1", { opacity: 0, y: 22 },
+        { opacity: 1, y: 0, duration: 0.80, ease: "power3.out" }, 1.35);
+      tl.fromTo("#f01-line2", { opacity: 0, y: 22 },
+        { opacity: 1, y: 0, duration: 0.80, ease: "power3.out" }, 2.05);
+      tl.to({}, { duration: 4 }, 0);
+      window.__timelines["01-hover"] = tl;
+    })();
+  </script>
+</template>

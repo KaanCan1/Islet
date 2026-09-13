@@ -1,0 +1,63 @@
+<template>
+  <style>
+    @font-face{font-family:"EB Garamond";src:url("assets/fonts/EBGaramond-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+    @font-face{font-family:"Inter";src:url("assets/fonts/Inter-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+    @font-face{font-family:"JetBrains Mono";src:url("assets/fonts/JetBrainsMono-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+    @font-face{font-family:"JetBrains Mono";src:url("assets/fonts/JetBrainsMono-700.woff2") format("woff2");font-weight:700;font-style:normal;font-display:block}
+
+    /* The frame ground is a clip layer, never the root: at assembly the root is
+       gated to this frame's window, so a background painted on it is not a
+       dependable full-frame ground. */
+    #root{position:absolute;inset:0;overflow:hidden;container-type:size}
+
+    .f02-ground{position:absolute;inset:0;background:#F7F5F2}
+    .f02-stage{position:absolute;inset:0}
+
+    .f02-kicker{
+      position:absolute;font-family:"JetBrains Mono","Courier New",monospace;font-weight:500;
+      font-size:28px;letter-spacing:.16em;text-transform:uppercase;color:rgba(20,20,19,.55);
+      white-space:nowrap;
+    }
+    .f02-kicker .f02-spike{color:#CC785C;margin-right:.62em}
+
+    .f02-display{
+      position:absolute;font-family:"EB Garamond","Times New Roman",serif;font-weight:400;
+      color:#141413;
+    }
+
+    #f02-word{left:120px;top:286px;font-size:200px;line-height:1;letter-spacing:-.028em}
+    #f02-rule{position:absolute;left:120px;top:540px;width:960px;height:1px;background:rgba(20,20,19,.12);transform-origin:0 50%}
+    #f02-lead{position:absolute;left:120px;top:596px;width:1240px;font-family:"Inter",system-ui,sans-serif;font-weight:400;font-size:42px;line-height:1.5;color:rgba(20,20,19,.76)}
+    #f02-index{position:absolute;left:120px;top:846px;font-family:"JetBrains Mono","Courier New",monospace;font-weight:500;font-size:26px;letter-spacing:.16em;text-transform:uppercase;color:rgba(20,20,19,.5);display:flex;gap:22px;align-items:baseline}
+    #f02-index .f02-dot{color:#CC785C}
+  </style>
+
+  <div id="root" data-composition-id="02-islet" data-width="1920" data-height="1080" data-duration="4.1">
+    <div id="f02-ground" class="clip f02-ground" data-start="0" data-duration="4.1" data-track-index="0"></div>
+    <div id="f02-stage" class="clip f02-stage" data-start="0" data-duration="4.1" data-track-index="1">
+      <div class="f02-display" id="f02-word" data-layout-allow-overlap>Islet</div>
+      <div id="f02-rule"></div>
+      <div id="f02-lead">A panel that lives in your MacBook&rsquo;s camera notch, and nowhere else.</div>
+      <div id="f02-index">
+        <span class="f02-item">MIT</span><span class="f02-dot f02-item">&middot;</span><span class="f02-item">macOS 14+</span><span class="f02-dot f02-item">&middot;</span><span class="f02-item">one author</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.__timelines = window.__timelines || {};
+    (function () {
+      var tl = gsap.timeline({ paused: true });
+      tl.fromTo("#f02-word", { opacity: 0, y: 26 },
+        { opacity: 1, y: 0, duration: 0.80, ease: "power3.out" }, 0);
+      tl.fromTo("#f02-rule", { opacity: 1, scaleX: 0 },
+        { scaleX: 1, duration: 0.70, ease: "power2.inOut" }, 0.45);
+      tl.fromTo("#f02-lead", { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.75, ease: "power3.out" }, 0.85);
+      tl.fromTo("#f02-index .f02-item", { opacity: 0 },
+        { opacity: 1, duration: 0.55, ease: "power2.out", stagger: 0.10 }, 1.55);
+      tl.to({}, { duration: 3.6 }, 0);
+      window.__timelines["02-islet"] = tl;
+    })();
+  </script>
+</template>

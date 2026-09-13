@@ -59,7 +59,7 @@ struct PosturePanel: View {
                 .foregroundStyle(.white.opacity(0.92))
                 .monospacedDigit()
                 .contentTransition(.numericText())
-                .animation(.default, value: Int(drop.rounded()))
+                .animation(Capture.pinned ? nil : .default, value: Int(drop.rounded()))
         }
         .frame(height: 26)
     }
@@ -84,7 +84,10 @@ struct PosturePanel: View {
             }
             .frame(height: 6)
             .frame(maxHeight: .infinity, alignment: .center)
-            .animation(.spring(response: 0.35, dampingFraction: 0.85), value: fraction)
+            .animation(
+                Capture.pinned ? nil : .spring(response: 0.35, dampingFraction: 0.85),
+                value: fraction
+            )
         }
         .frame(height: 14)
     }

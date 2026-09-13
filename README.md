@@ -16,8 +16,9 @@ progress bar and transport controls. Click the artwork to jump to the app it is
 playing in.
 
 **Claude** — how much of the current Claude Code five-hour block you have spent,
-beside the transport. Click it for the weekly window too. The column and its tab
-disappear entirely if you don't use Claude Code.
+beside the transport. Click it for the weekly window too. Exact when the `claude`
+CLI's token is reachable, and an estimate labelled as one when it is not. The
+column and its tab disappear entirely if you don't use Claude Code.
 
 **Shelf** — every screenshot you take lands here the moment it is written, and
 the panel opens for a few seconds to show it. Click one to open it the way the
@@ -122,13 +123,25 @@ quietly. Answer "Not now" and none of it is touched.
   and keeping the new one to itself would log you out of Claude Code. Only that one
   item is touched, in place, and everything else stored alongside it is preserved.
 - Without it, usage is **estimated** from `~/.claude/projects/*.jsonl` — timestamps
-  and token counts only, never message content. Expect roughly a quarter of
-  spread: nothing on disk states the account's limits, so the ceiling is inferred
-  from the moments Claude actually cut you off, and those disagree with each other
-  by up to 3.5x. The panel labels which of the two you are looking at.
-- Scanning is incremental, so only the first pass is slow — about 12 seconds for
-  380 MB of transcripts, on a background thread. It refreshes every minute, and
-  the panel has a refresh button.
+  and token counts only, never message content. Nothing on disk states the
+  account's limits, so the ceiling is learned from the moments Claude actually
+  cut you off: the panel counts tokens against the **median** of the amounts
+  standing in the window at each of those. The percentage is a guess and the
+  panel says so; it stays blank until two cut-offs have been recorded, because
+  one is an anecdote.
+- That rule was picked by replaying this machine's own rejections and asking
+  which one would have read 100% at the moment the account was actually refused,
+  scoring each using only the rejections before it. Counting minutes and taking
+  the largest — what Islet did before — was out by 42 points on average, and on
+  one block read 12% at a moment Claude had just cut the account off. Counting
+  tokens and taking the median is out by 21. The largest is the trap: it is set
+  by the single window that ran furthest before Claude objected, so every other
+  window reads low. Being told 100% a little early is the better failure, since
+  the point of the number is to warn.
+- Scanning is incremental, so only the first pass is slow — about 15 seconds for
+  530 MB of transcripts, on a background thread. It refreshes every minute, and
+  the panel has a refresh button that also forces an early API read; pressing it
+  during a scan queues the force rather than dropping it.
 - The Claude column and its tab disappear entirely if you don't use Claude Code.
 - Displays without a notch get a virtual one at the top centre of the screen.
 - In full-screen apps macOS slides the menu bar down the moment the cursor touches
@@ -150,6 +163,36 @@ quietly. Answer "Not now" and none of it is touched.
   posture monitor is doing inside the running app every two seconds — the live
   angle, whether it has a reference yet, and which tabs the panel is showing.
   It is the only way to see that, for the reason above.
+
+## Reproducing the screenshots and the demo
+
+Everything under `docs/` is generated, and the scripts that generate it are in
+the repo — nothing in the README is a mockup.
+
+```bash
+./scripts/capture_docs.sh   # the five panel stills and the collapsed peek
+./scripts/record_demo.sh    # docs/demo.mp4
+```
+
+`capture_docs.sh` takes each still as a **window** capture, so nothing behind or
+beside the panel is ever in the image, and points the shelf at a scratch folder
+so your Desktop is left alone. `ISLET_DEMO` holds the panel open on one tab and
+also freezes anything that animates on its own — a scrolling title, the posture
+panel's rolling degree — because otherwise the shutter catches them mid-transition
+and the number comes out smeared.
+
+`record_demo.sh` lays a flat backdrop over the strip it records, in the same
+cream the promo is built on, and drives the cursor itself: into the notch, across
+the tabs, then away. Two details are there because their absence was visible —
+it selects the Music tab first, since seeding the shelf leaves the shelf's own
+tab showing, and it stops playback before the cursor leaves, since a summary
+stays beside the notch while something is playing and the panel would never
+collapse to nothing. The master is 60fps with every frame a keyframe, so the
+promo renderer can seek it exactly.
+
+The promo itself is a [HyperFrames](https://hyperframes.heygen.com) project in
+`videos/islet-promo/`; `npm run check` validates it and `npm run render` produces
+`docs/demo.mp4`.
 
 ## License and notices
 

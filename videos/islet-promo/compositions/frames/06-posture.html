@@ -1,0 +1,60 @@
+<template>
+  <style>
+    @font-face{font-family:"EB Garamond";src:url("assets/fonts/EBGaramond-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+    @font-face{font-family:"Inter";src:url("assets/fonts/Inter-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+    @font-face{font-family:"JetBrains Mono";src:url("assets/fonts/JetBrainsMono-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+    @font-face{font-family:"JetBrains Mono";src:url("assets/fonts/JetBrainsMono-700.woff2") format("woff2");font-weight:700;font-style:normal;font-display:block}
+
+    /* The frame ground is a clip layer, never the root: at assembly the root is
+       gated to this frame's window, so a background painted on it is not a
+       dependable full-frame ground. */
+    #root{position:absolute;inset:0;overflow:hidden;container-type:size}
+
+    .f06-ground{position:absolute;inset:0;background:#F7F5F2}
+    .f06-stage{position:absolute;inset:0}
+
+    .f06-kicker{
+      position:absolute;font-family:"JetBrains Mono","Courier New",monospace;font-weight:500;
+      font-size:28px;letter-spacing:.16em;text-transform:uppercase;color:rgba(20,20,19,.55);
+      white-space:nowrap;
+    }
+    .f06-kicker .f06-spike{color:#CC785C;margin-right:.62em}
+
+    .f06-display{
+      position:absolute;font-family:"EB Garamond","Times New Roman",serif;font-weight:400;
+      color:#141413;
+    }
+
+    #f06-kicker{left:120px;top:152px}
+    #f06-headline{left:120px;top:208px;width:1680px;font-size:88px;line-height:1.06;letter-spacing:-.018em}
+    #f06-panel{position:absolute;left:360px;top:357px;width:1200px;height:425px;display:block}
+    #f06-sub{position:absolute;left:360px;top:830px;width:1200px;font-family:"Inter",system-ui,sans-serif;font-weight:400;font-size:34px;line-height:1.45;color:rgba(20,20,19,.68)}
+  </style>
+
+  <div id="root" data-composition-id="06-posture" data-width="1920" data-height="1080" data-duration="4.9">
+    <div id="f06-ground" class="clip f06-ground" data-start="0" data-duration="4.9" data-track-index="0"></div>
+    <div id="f06-stage" class="clip f06-stage" data-start="0" data-duration="4.9" data-track-index="1">
+      <div class="f06-kicker" id="f06-kicker" data-layout-allow-overlap><span class="f06-spike" data-layout-allow-overlap>&#10033;</span>Posture</div>
+      <div class="f06-display" id="f06-headline" data-layout-allow-overlap>Your AirPods know your head is dropping.</div>
+      <img id="f06-panel" src="assets/posture.png" alt="">
+      <div id="f06-sub">Measured against the upright you set. If it stays down, the notch says so once &mdash; and then leaves you alone.</div>
+    </div>
+  </div>
+
+  <script>
+    window.__timelines = window.__timelines || {};
+    (function () {
+      var tl = gsap.timeline({ paused: true });
+      tl.fromTo("#f06-kicker", { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.60, ease: "power2.out" }, 0);
+      tl.fromTo("#f06-headline", { opacity: 0, y: 22 },
+        { opacity: 1, y: 0, duration: 0.82, ease: "power3.out" }, 0.10);
+      tl.fromTo("#f06-panel", { opacity: 0, y: 30 },
+        { opacity: 1, y: 0, duration: 0.87, ease: "power3.out" }, 0.25);
+      tl.fromTo("#f06-sub", { opacity: 0, y: 12 },
+        { opacity: 1, y: 0, duration: 0.70, ease: "power3.out" }, 1.25);
+      tl.to({}, { duration: 4.4 }, 0);
+      window.__timelines["06-posture"] = tl;
+    })();
+  </script>
+</template>

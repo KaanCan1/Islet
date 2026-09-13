@@ -1,0 +1,60 @@
+<template>
+  <style>
+    @font-face{font-family:"EB Garamond";src:url("assets/fonts/EBGaramond-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+    @font-face{font-family:"Inter";src:url("assets/fonts/Inter-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+    @font-face{font-family:"JetBrains Mono";src:url("assets/fonts/JetBrainsMono-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+    @font-face{font-family:"JetBrains Mono";src:url("assets/fonts/JetBrainsMono-700.woff2") format("woff2");font-weight:700;font-style:normal;font-display:block}
+
+    /* The frame ground is a clip layer, never the root: at assembly the root is
+       gated to this frame's window, so a background painted on it is not a
+       dependable full-frame ground. */
+    #root{position:absolute;inset:0;overflow:hidden;container-type:size}
+
+    .f05-ground{position:absolute;inset:0;background:#F7F5F2}
+    .f05-stage{position:absolute;inset:0}
+
+    .f05-kicker{
+      position:absolute;font-family:"JetBrains Mono","Courier New",monospace;font-weight:500;
+      font-size:28px;letter-spacing:.16em;text-transform:uppercase;color:rgba(20,20,19,.55);
+      white-space:nowrap;
+    }
+    .f05-kicker .f05-spike{color:#CC785C;margin-right:.62em}
+
+    .f05-display{
+      position:absolute;font-family:"EB Garamond","Times New Roman",serif;font-weight:400;
+      color:#141413;
+    }
+
+    #f05-kicker{left:120px;top:152px}
+    #f05-headline{left:120px;top:208px;width:1680px;font-size:88px;line-height:1.06;letter-spacing:-.018em}
+    #f05-panel{position:absolute;left:360px;top:347px;width:1200px;height:435px;display:block}
+    #f05-sub{position:absolute;left:360px;top:830px;width:1200px;font-family:"Inter",system-ui,sans-serif;font-weight:400;font-size:34px;line-height:1.45;color:rgba(20,20,19,.68)}
+  </style>
+
+  <div id="root" data-composition-id="05-timer" data-width="1920" data-height="1080" data-duration="4.1">
+    <div id="f05-ground" class="clip f05-ground" data-start="0" data-duration="4.1" data-track-index="0"></div>
+    <div id="f05-stage" class="clip f05-stage" data-start="0" data-duration="4.1" data-track-index="1">
+      <div class="f05-kicker" id="f05-kicker" data-layout-allow-overlap><span class="f05-spike" data-layout-allow-overlap>&#10033;</span>Timer</div>
+      <div class="f05-display" id="f05-headline" data-layout-allow-overlap>A pomodoro that never takes a window.</div>
+      <img id="f05-panel" src="assets/timer.png" alt="">
+      <div id="f05-sub">Focus and Break, battery alerts, and it can stay up on the lock screen.</div>
+    </div>
+  </div>
+
+  <script>
+    window.__timelines = window.__timelines || {};
+    (function () {
+      var tl = gsap.timeline({ paused: true });
+      tl.fromTo("#f05-kicker", { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.60, ease: "power2.out" }, 0);
+      tl.fromTo("#f05-headline", { opacity: 0, y: 22 },
+        { opacity: 1, y: 0, duration: 0.82, ease: "power3.out" }, 0.10);
+      tl.fromTo("#f05-panel", { opacity: 0, y: 30 },
+        { opacity: 1, y: 0, duration: 0.87, ease: "power3.out" }, 0.25);
+      tl.fromTo("#f05-sub", { opacity: 0, y: 12 },
+        { opacity: 1, y: 0, duration: 0.70, ease: "power3.out" }, 1.25);
+      tl.to({}, { duration: 3.6 }, 0);
+      window.__timelines["05-timer"] = tl;
+    })();
+  </script>
+</template>

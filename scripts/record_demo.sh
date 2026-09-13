@@ -4,10 +4,14 @@
 # Takes over the cursor for about twenty seconds and lays a flat backdrop over
 # the strip being recorded, so the demo shows the panel rather than the desktop.
 # Whatever is playing in Music or Spotify is what appears in the panel.
+#
+# Writes a 60fps master. ISLET_DEMO_OUT names a directory to write into, which
+# is how the promo project takes the footage without touching docs/.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP="$ROOT/dist/Islet.app"
+OUT="${ISLET_DEMO_OUT:-$ROOT/docs}"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
@@ -30,23 +34,41 @@ for f in music timer claude; do
 done
 sleep 5   # let the shelf's own four-second reveal lapse
 
-# The region is centred on the screen and 495x215pt, which is 990x430 at 2x.
-CENTRE=$(osascript -e 'tell application "Finder" to get bounds of window of desktop' | awk -F', ' '{print int($3/2)}')
-RECT="$((CENTRE - 247)),0,495,215"
+# The reveal leaves the shelf tab selected, so without this the take opens on
+# Screenshots instead of Music.
+echo "==> Selecting the opening tab"
+"$WORK/stage" --preselect music
+sleep 1.5
+
+# Centred on the notched screen and 495x215pt, which is 990x430 at 2x. The stage
+# owns the geometry; asking Finder for the desktop returns the union of every
+# display, which centres the strip between two screens when a second is attached.
+RECT="$("$WORK/stage" --rect)"
 echo "==> Recording $RECT"
-screencapture -v -C -V 20 -R "$RECT" "$WORK/demo.mov" &
+screencapture -v -C -V 28 -R "$RECT" "$WORK/demo.mov" &
 REC=$!
 sleep 0.8
-"$WORK/stage"
+STAGE_PAUSE_MUSIC="${ISLET_DEMO_PAUSE_MUSIC:-1}" "$WORK/stage"
 wait $REC 2>/dev/null || true
 
 echo "==> Encoding"
-ffmpeg -v error -ss 1.2 -to 19.3 -i "$WORK/demo.mov" \
-	-c:v libx264 -pix_fmt yuv420p -crf 23 -r 30 -movflags +faststart -an \
-	"$ROOT/docs/demo.mp4" -y
-ffmpeg -v error -ss 1.2 -to 19.3 -i "$WORK/demo.mov" \
-	-vf "fps=15,scale=700:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3" \
-	"$ROOT/docs/demo.gif" -y
+mkdir -p "$OUT"
+# A near-lossless 60fps master: this is source footage for the promo, and every
+# generation after this one is a re-encode of it. Every frame is a keyframe
+# because the promo renderer seeks this clip once per output frame, and a sparse
+# GOP lands it on the wrong moment. The crop drops the last 40px, where the top
+# edge of whatever window sits under the backdrop can show through.
+ffmpeg -v error -ss "${ISLET_DEMO_IN:-1.35}" -to "${ISLET_DEMO_OUT_T:-23.0}" -i "$WORK/demo.mov" \
+	-vf "crop=990:390:0:0" \
+	-c:v libx264 -pix_fmt yuv420p -crf 16 -preset slow -r 60 \
+	-x264-params "keyint=1:min-keyint=1:scenecut=0" -movflags +faststart -an \
+	"$OUT/demo.mp4" -y
+
+# Kept when asked for, so the take can be re-trimmed without re-recording.
+if [ -n "${ISLET_DEMO_KEEP_RAW:-}" ]; then
+	cp "$WORK/demo.mov" "$ISLET_DEMO_KEEP_RAW"
+	echo "==> Raw kept at $ISLET_DEMO_KEEP_RAW"
+fi
 
 pkill -x Islet 2>/dev/null || true
-echo "==> Done: docs/demo.mp4 $(ls -lh "$ROOT/docs/demo.mp4" | awk '{print $5}'), docs/demo.gif $(ls -lh "$ROOT/docs/demo.gif" | awk '{print $5}')"
+echo "==> Done: $OUT/demo.mp4 $(ls -lh "$OUT/demo.mp4" | awk '{print $5}')"
