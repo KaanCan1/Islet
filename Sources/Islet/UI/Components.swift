@@ -42,30 +42,114 @@ struct IconButton: View {
 
 // MARK: - Equalizer
 
+/// Four bars bouncing at their own pace while something plays.
+///
+/// Drawn with Core Animation rather than a SwiftUI timeline. It sits beside the
+/// notch for as long as music plays, and the timeline re-ran SwiftUI layout for
+/// the whole panel on every frame: six points of CPU, three quarters of what
+/// Islet spent sitting idle beside a playing track. Animations added to a layer
+/// run in the render server, so the app does nothing per frame.
 struct Equalizer: View {
     var active: Bool
     var tint: Color = .white
     var height: CGFloat = 14
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 20.0, paused: !active)) { context in
-            let t = context.date.timeIntervalSinceReferenceDate
-            HStack(alignment: .center, spacing: 2.5) {
-                ForEach(0 ..< 4, id: \.self) { index in
-                    Capsule()
-                        .fill(tint.opacity(active ? 0.9 : 0.35))
-                        .frame(width: 2.5, height: height * level(t: t, index: index))
-                }
-            }
-            .frame(height: height)
+        EqualizerBars(active: active, tint: NSColor(tint), height: height)
+            .frame(width: EqualizerView.width, height: height)
+    }
+}
+
+private struct EqualizerBars: NSViewRepresentable {
+    var active: Bool
+    var tint: NSColor
+    var height: CGFloat
+
+    func makeNSView(context: Context) -> EqualizerView { EqualizerView() }
+
+    func updateNSView(_ view: EqualizerView, context: Context) {
+        view.configure(active: active, tint: tint, height: height)
+    }
+}
+
+private final class EqualizerView: NSView {
+    static let barWidth: CGFloat = 2.5
+    static let spacing: CGFloat = 2.5
+    static var width: CGFloat { barWidth * 4 + spacing * 3 }
+
+    /// Each bar follows abs(sin(t * speed + offset)): up over half of pi / speed
+    /// seconds and back down over the other half, quickest at the bottom.
+    private static let speeds: [Double] = [3.1, 4.3, 2.6, 3.7]
+    private static let offsets: [Double] = [0.0, 1.2, 2.4, 0.6]
+
+    private var bars: [CALayer] = []
+    private var active = false
+    private var tint = NSColor.white
+    private var height: CGFloat = 0
+
+    init() {
+        super.init(frame: .zero)
+        wantsLayer = true
+        for _ in 0 ..< 4 {
+            let bar = CALayer()
+            bar.cornerRadius = Self.barWidth / 2
+            layer?.addSublayer(bar)
+            bars.append(bar)
         }
     }
 
-    private func level(t: Double, index: Int) -> Double {
-        guard active else { return 0.22 }
-        let speed = [3.1, 4.3, 2.6, 3.7][index]
-        let offset = [0.0, 1.2, 2.4, 0.6][index]
-        return 0.25 + 0.75 * abs(sin(t * speed + offset))
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    /// Purely decorative: clicks belong to whatever is around it.
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    func configure(active: Bool, tint: NSColor, height: CGFloat) {
+        // Also redone when the bounce has gone missing while it should be
+        // running, so nothing has to know what might have stripped it.
+        let lost = active && bars[0].animation(forKey: "bounce") == nil
+        guard lost || active != self.active || tint != self.tint || height != self.height else { return }
+        self.active = active
+        self.tint = tint
+        self.height = height
+        needsLayout = true
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for (index, bar) in bars.enumerated() {
+            bar.backgroundColor = tint.withAlphaComponent(active ? 0.9 : 0.35).cgColor
+            bar.bounds.size = CGSize(width: Self.barWidth, height: height * 0.22)
+            bar.removeAnimation(forKey: "bounce")
+            guard active else { continue }
+
+            let speed = Self.speeds[index]
+            let bounce = CABasicAnimation(keyPath: "bounds.size.height")
+            bounce.fromValue = height * 0.25
+            bounce.toValue = height
+            bounce.duration = .pi / (2 * speed)
+            bounce.autoreverses = true
+            bounce.repeatCount = .infinity
+            bounce.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            bounce.timeOffset = Self.offsets[index].truncatingRemainder(dividingBy: .pi) / speed
+            // The timeline it replaces drew at 20fps; asking for more would only
+            // spend the render server's time on four bars.
+            bounce.preferredFrameRateRange = CAFrameRateRange(minimum: 10, maximum: 30, preferred: 20)
+            bounce.isRemovedOnCompletion = false
+            bar.add(bounce, forKey: "bounce")
+        }
+        CATransaction.commit()
+    }
+
+    override func layout() {
+        super.layout()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for (index, bar) in bars.enumerated() {
+            bar.position = CGPoint(
+                x: CGFloat(index) * (Self.barWidth + Self.spacing) + Self.barWidth / 2,
+                y: bounds.midY
+            )
+        }
+        CATransaction.commit()
     }
 }
 
