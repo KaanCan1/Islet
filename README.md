@@ -19,6 +19,9 @@ playing in.
 beside the transport. Click it for the weekly window too. Exact when the `claude`
 CLI's token is reachable, and an estimate labelled as one when it is not. The
 column and its tab disappear entirely if you don't use Claude Code.
+The notch also says so on its own when a window passes 80% and 95%, when Claude
+cuts you off, and when a window you were warned about comes clear again — once
+each, so a restart does not repeat one.
 
 **Shelf** — every screenshot you take lands here the moment it is written, and
 the panel opens for a few seconds to show it. Click one to open it the way the

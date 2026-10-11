@@ -11,6 +11,7 @@ final class NotchController {
     private var hoverTimer: Timer?
     private let battery = BatteryMonitor()
     private let screenshots = ScreenshotWatcher()
+    private let claudeAlerts = ClaudeAlerts()
     private var rightClickMonitor: Any?
 
     /// Right-clicking the open panel asks for the settings menu.
@@ -95,6 +96,18 @@ final class NotchController {
             guard let self, let drop = self.state.posture.drop else { return false }
             return self.state.present(.posture(degrees: Int(drop.rounded()), minutes: minutes))
         }
+
+        claudeAlerts.onAlert = { [weak self] window, alert, figures in
+            guard let self else { return false }
+            return self.state.present(.claude(
+                window: window.rawValue,
+                alert: alert,
+                percent: alert == .limit ? nil : figures.percent.map { Int(($0 * 100).rounded()) },
+                isEstimate: !figures.isExact,
+                resets: alert == .cleared || figures.resetsAt == nil ? nil : figures.remainingText
+            ))
+        }
+        state.claude.onSettled = { [weak self] snapshot in self?.claudeAlerts.check(snapshot) }
 
         updateClaudeMonitor()
         updateShelfWatcher()

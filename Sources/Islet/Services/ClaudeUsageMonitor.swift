@@ -113,6 +113,12 @@ final class ClaudeUsageMonitor: ObservableObject {
     /// rather than quietly showing an estimate that looks like a readout.
     @Published private(set) var apiFailure: ClaudeUsageAPI.Failure?
 
+    /// Called once per pass with the figures it settled on. The snapshot itself
+    /// is published twice a pass — the local estimate first, then again once the
+    /// API answers — and the first of those can sit twenty points out, which is
+    /// fine for a panel that redraws and wrong for an alert that cannot be taken back.
+    var onSettled: ((Snapshot) -> Void)?
+
     private var reading: ClaudeUsageAPI.Reading?
     private var lastFetch: Date?
     /// The endpoint rate limits hard; well inside its safe interval.
@@ -167,6 +173,7 @@ final class ClaudeUsageMonitor: ObservableObject {
                 snapshot = await summarise(with: reading)
             }
             pass = nil
+            if let snapshot { onSettled?(snapshot) }
             if forceQueued {
                 forceQueued = false
                 refresh(force: true)

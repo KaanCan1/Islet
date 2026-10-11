@@ -15,6 +15,9 @@ final class Preferences: ObservableObject {
     @Published var claudeConsentAsked: Bool { didSet { store.set(claudeConsentAsked, forKey: "claudeConsentAsked") } }
     /// Show the Claude Code usage column in the music panel.
     @Published var showClaudeUsage: Bool { didSet { store.set(showClaudeUsage, forKey: "showClaudeUsage") } }
+    /// Say so from the notch when a Claude window passes 80% and 95%, hits its
+    /// limit, or comes clear again after one of those.
+    @Published var claudeAlerts: Bool { didSet { store.set(claudeAlerts, forKey: "claudeAlerts") } }
     /// Keep the panel visible on the lock screen (raises the window level).
     @Published var showOnLockScreen: Bool { didSet { store.set(showOnLockScreen, forKey: "showOnLockScreen") } }
     /// Open the panel when the charger is connected or the battery runs low.
@@ -37,6 +40,7 @@ final class Preferences: ObservableObject {
             "showPeek": true,
             "showClaudeUsage": false,
             "claudeConsentAsked": false,
+            "claudeAlerts": true,
             "showOnLockScreen": true,
             "showBatteryAlerts": true,
             "shelfEnabled": true,
@@ -50,6 +54,7 @@ final class Preferences: ObservableObject {
         showPeek = store.bool(forKey: "showPeek")
         showClaudeUsage = store.bool(forKey: "showClaudeUsage")
         claudeConsentAsked = store.bool(forKey: "claudeConsentAsked")
+        claudeAlerts = store.bool(forKey: "claudeAlerts")
         showOnLockScreen = store.bool(forKey: "showOnLockScreen")
         showBatteryAlerts = store.bool(forKey: "showBatteryAlerts")
         shelfEnabled = store.bool(forKey: "shelfEnabled")
@@ -75,6 +80,17 @@ final class Preferences: ObservableObject {
     var postureSlouchedSeconds: Double {
         get { store.double(forKey: "postureSlouchedSeconds") }
         set { store.set(newValue, forKey: "postureSlouchedSeconds") }
+    }
+
+    /// The highest Claude alert already given for the current window, per window,
+    /// so a restart does not repeat one. Plain accessors for the same reason as
+    /// the posture totals: nothing on screen observes them.
+    func claudeAlertLevel(for window: String) -> Int {
+        store.integer(forKey: "claudeAlertLevel." + window)
+    }
+
+    func setClaudeAlertLevel(_ level: Int, for window: String) {
+        store.set(level, forKey: "claudeAlertLevel." + window)
     }
 
     var launchAtLogin: Bool {

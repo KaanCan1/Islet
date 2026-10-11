@@ -60,6 +60,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func buildMenu() -> NSMenu {
         let menu = NSMenu()
         menu.delegate = self
+        // Otherwise AppKit enables every item with a target and ignores the
+        // Claude alerts item being greyed out below.
+        menu.autoenablesItems = false
 
         menu.addItem(withTitle: "Music", action: #selector(openMusic), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Timer", action: #selector(openTimer), keyEquivalent: "").target = self
@@ -67,6 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         addToggle(to: menu, title: "Peek beside the notch", id: "peek", action: #selector(togglePeek))
         addToggle(to: menu, title: "Claude usage in the music panel", id: "claude", action: #selector(toggleClaude))
+        addToggle(to: menu, title: "Claude limit alerts", id: "claudeAlerts", action: #selector(toggleClaudeAlerts))
         addToggle(to: menu, title: "Show on lock screen", id: "lock", action: #selector(toggleLockScreen))
         addToggle(to: menu, title: "Battery and charging alerts", id: "battery", action: #selector(toggleBattery))
         addToggle(to: menu, title: "Screenshot shelf", id: "shelf", action: #selector(toggleShelf))
@@ -96,6 +100,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Preferences.shared.showClaudeUsage.toggle()
         controller.updateClaudeMonitor()
     }
+    @objc private func toggleClaudeAlerts() { Preferences.shared.claudeAlerts.toggle() }
     @objc private func toggleBattery() { Preferences.shared.showBatteryAlerts.toggle() }
 
     @objc private func toggleShelf() {
@@ -146,6 +151,10 @@ extension AppDelegate: NSMenuDelegate {
             case "peek": item.state = prefs.showPeek ? .on : .off
             case "lock": item.state = prefs.showOnLockScreen ? .on : .off
             case "claude": item.state = prefs.showClaudeUsage ? .on : .off
+            case "claudeAlerts":
+                item.state = prefs.claudeAlerts ? .on : .off
+                // Alerts read the same figures, so they mean nothing without them.
+                item.isEnabled = prefs.showClaudeUsage
             case "battery": item.state = prefs.showBatteryAlerts ? .on : .off
             case "shelf": item.state = prefs.shelfEnabled ? .on : .off
             case "posture": item.state = prefs.postureAlerts ? .on : .off
