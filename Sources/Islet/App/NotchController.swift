@@ -13,6 +13,7 @@ final class NotchController {
     private let screenshots = ScreenshotWatcher()
     private let claudeAlerts = ClaudeAlerts()
     private var rightClickMonitor: Any?
+    private var pointerMonitors: [Any] = []
 
     /// Right-clicking the open panel asks for the settings menu.
     ///
@@ -43,11 +44,18 @@ final class NotchController {
             MainActor.assumeIsolated { self?.rebuild() }
         }
 
-        let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+        // The pointer is followed by its own events, so opening is as quick as
+        // the mouse rather than as quick as a poll. The timer stays only as the
+        // clock for what expires by itself — an alert, a panel held open — and as
+        // a net for any movement the monitors do not see. Polling at 30Hz to do
+        // both cost three quarters of a point of CPU with the mouse untouched,
+        // which was most of what Islet spent sitting idle.
+        let timer = Timer(timeInterval: 0.2, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
         RunLoop.main.add(timer, forMode: .common)
         hoverTimer = timer
+        startPointerMonitors()
 
         // Returns a plain Bool rather than the event itself: handing an NSEvent
         // back across the isolation boundary is an error under Swift 6.
@@ -65,6 +73,26 @@ final class NotchController {
                 return true
             }
             return swallowed ? nil : event
+        }
+    }
+
+    /// Mouse events need no permission to watch, unlike keys. Global monitors
+    /// see movement over other apps; the local one sees it over the open panel,
+    /// which the global ones never do. Button-ups matter as much as moves: a drag
+    /// out of the shelf ends with a release, and that is when it may collapse.
+    private func startPointerMonitors() {
+        let mask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .rightMouseDragged,
+                                           .leftMouseUp, .rightMouseUp]
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: mask, handler: { [weak self] _ in
+            MainActor.assumeIsolated { self?.tick() }
+        }) {
+            pointerMonitors.append(global)
+        }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: mask, handler: { [weak self] event in
+            MainActor.assumeIsolated { self?.tick() }
+            return event
+        }) {
+            pointerMonitors.append(local)
         }
     }
 

@@ -60,9 +60,13 @@ final class Backdrop: NSPanel {
 /// thread and NSEvent.mouseLocation is not the place to ask from there.
 var cursor = CGPoint(x: centreX, y: 235)
 
+/// Posted as a real move rather than warped. A warp relocates the cursor
+/// without an event, and Islet follows the pointer by its events; a warped
+/// glide is only noticed by its slow fallback poll, and the panel opens late.
 func warp(_ x: CGFloat, _ y: CGFloat) {
     cursor = CGPoint(x: x, y: y)
-    CGWarpMouseCursorPosition(cursor)
+    CGEvent(mouseEventSource: nil, mouseType: .mouseMoved,
+            mouseCursorPosition: cursor, mouseButton: .left)?.post(tap: .cghidEventTap)
 }
 
 func glide(to target: CGPoint, seconds: Double) {
