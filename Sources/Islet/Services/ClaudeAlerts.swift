@@ -30,7 +30,7 @@ final class ClaudeAlerts {
     }
 
     /// A window at this fraction or lower, having been warned about, has turned over.
-    static let rearmBelow = 0.5
+    nonisolated static let rearmBelow = 0.5
 
     /// Asked to put the alert on screen. Returns whether it got there; one that
     /// did not is tried again on the next reading instead of being marked said.
