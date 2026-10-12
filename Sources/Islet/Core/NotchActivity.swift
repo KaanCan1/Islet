@@ -14,6 +14,8 @@ enum NotchActivity: Equatable {
     case claude(window: String, alert: ClaudeAlert, percent: Int?, isEstimate: Bool, resets: String?)
 
     enum ClaudeAlert: Equatable { case warning, critical, limit, cleared }
+    /// The pomodoro ran out. `nextMinutes` is the length of what comes next.
+    case timer(finished: PomodoroTimer.Mode, nextMinutes: Int)
 
     /// How long it stays on screen. Posture and Claude get a beat longer: they
     /// arrive while you are looking at something else, so they have to survive
@@ -21,7 +23,7 @@ enum NotchActivity: Equatable {
     var duration: TimeInterval {
         switch self {
         case .battery: return 4
-        case .posture, .claude: return 6
+        case .posture, .claude, .timer: return 6
         }
     }
 
@@ -39,6 +41,9 @@ enum NotchActivity: Equatable {
             case .limit: return "gauge.with.needle.fill"
             case .cleared: return "gauge.low"
             }
+        // What comes next: a break, or back to work.
+        case .timer(let finished, _):
+            return finished == .focus ? "cup.and.saucer.fill" : "timer"
         }
     }
 
@@ -55,6 +60,8 @@ enum NotchActivity: Equatable {
             case .critical, .limit: return .red
             case .cleared: return Color(red: 0.35, green: 0.85, blue: 0.45)
             }
+        // The colour the Timer tab gives the mode that comes next.
+        case .timer(let finished, _): return finished == .focus ? .cyan : .orange
         }
     }
 
@@ -66,6 +73,8 @@ enum NotchActivity: Equatable {
         case .posture(let degrees, _): return Double(degrees) / 45
         case .claude(_, let alert, let percent, _, _):
             return alert == .limit ? 1 : Double(percent ?? 0) / 100
+        // Run all the way down.
+        case .timer: return 1
         }
     }
 
@@ -91,6 +100,8 @@ enum NotchActivity: Equatable {
                 let head = [window, amount].compactMap { $0 }.joined(separator: " · ")
                 return resets.map { "\(head) · resets \($0)" } ?? head
             }
+        case .timer(let finished, let next):
+            return finished == .focus ? "focus done · \(next) min break" : "break over · \(next) min focus"
         }
     }
 
@@ -109,6 +120,8 @@ enum NotchActivity: Equatable {
         case .battery: return Preferences.shared.showBatteryAlerts
         case .posture: return Preferences.shared.postureAlerts
         case .claude: return Preferences.shared.showClaudeUsage && Preferences.shared.claudeAlerts
+        // A timer you started is always worth hearing the end of.
+        case .timer: return true
         }
     }
 }

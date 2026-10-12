@@ -24,11 +24,28 @@ final class PomodoroTimer: ObservableObject {
     }
     @Published private(set) var remaining: Double = Double(Preferences.shared.focusMinutes * 60)
     @Published private(set) var isRunning = false
-    /// Signal used to open the panel by itself when the timer runs out.
-    @Published private(set) var finishedAt: Date?
+
+    /// A countdown that ran out, and which mode it was.
+    struct Finish: Equatable {
+        let at: Date
+        let mode: Mode
+    }
+
+    /// Set when the timer runs out, so the notch can say so. Carries the mode
+    /// itself: the mode flips to the next one straight afterwards, and a
+    /// subscriber is called before the change lands, so reading `mode` from
+    /// one would be guessing at the order.
+    @Published private(set) var finished: Finish?
 
     private var timer: Timer?
     private var deadline: Date?
+
+    /// Plays the end-of-timer sound. Replaceable, so tests can run a timer out
+    /// in silence.
+    var chime: @MainActor (Mode) -> Void = { mode in
+        guard Preferences.shared.chimeEnabled else { return }
+        NSSound(named: mode == .focus ? "Glass" : "Submarine")?.play()
+    }
 
     var minutes: Int {
         get { mode == .focus ? focusMinutes : breakMinutes }
@@ -51,7 +68,7 @@ final class PomodoroTimer: ObservableObject {
         deadline = Date().addingTimeInterval(remaining)
         isRunning = true
         let t = Timer(timeInterval: 0.2, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.onTick() }
+            MainActor.assumeIsolated { self?.tick() }
         }
         RunLoop.main.add(t, forMode: .common)
         timer = t
@@ -67,19 +84,19 @@ final class PomodoroTimer: ObservableObject {
     func reset() {
         pause()
         remaining = total
-        finishedAt = nil
+        finished = nil
     }
 
-    private func onTick() {
+    /// Counts down to `now`. The timer calls it a few times a second; tests
+    /// call it with a time past the deadline to run one out at once.
+    func tick(at now: Date = Date()) {
         guard let deadline else { return }
-        remaining = max(0, deadline.timeIntervalSinceNow)
+        remaining = max(0, deadline.timeIntervalSince(now))
         guard remaining <= 0 else { return }
 
         pause()
-        finishedAt = Date()
-        if Preferences.shared.chimeEnabled {
-            NSSound(named: mode == .focus ? "Glass" : "Submarine")?.play()
-        }
+        finished = Finish(at: now, mode: mode)
+        chime(mode)
         // Focus rolls into a break and vice versa.
         mode = mode == .focus ? .breakTime : .focus
         remaining = total

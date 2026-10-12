@@ -28,7 +28,9 @@ final class NotchState: ObservableObject {
         }
     }
 
-    @Published var isExpanded = false
+    @Published var isExpanded = false {
+        didSet { if !isExpanded { presentHeld() } }
+    }
     @Published var tab: Tab = .music
     /// Keeps the panel open while a slider is being dragged, even if the cursor
     /// wanders outside it.
@@ -38,6 +40,9 @@ final class NotchState: ObservableObject {
     /// A transient alert shown without any user interaction.
     @Published private(set) var activity: NotchActivity?
     private var activityExpiry: Date?
+    /// An alert that arrived while the panel was in use, kept for when it
+    /// closes, and whether it still means anything by then.
+    private var held: (activity: NotchActivity, stillWanted: () -> Bool)?
 
     let music = MusicManager()
     let pomodoro = PomodoroTimer()
@@ -56,13 +61,9 @@ final class NotchState: ObservableObject {
                           posture.objectWillChange, prefs.objectWillChange] {
             publisher.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &bag)
         }
-        // When the timer finishes, open the panel on the Timer tab.
-        pomodoro.$finishedAt
+        pomodoro.$finished
             .compactMap { $0 }
-            .sink { [weak self] _ in
-                self?.tab = .timer
-                self?.forceExpandUntil = Date().addingTimeInterval(6)
-            }
+            .sink { [weak self] finish in self?.timerFinished(finish) }
             .store(in: &bag)
     }
 
@@ -122,6 +123,35 @@ final class NotchState: ObservableObject {
         activity = new
         activityExpiry = Date().addingTimeInterval(new.duration)
         return true
+    }
+
+    /// The timer running out is said beside the notch rather than by throwing
+    /// the whole panel open: a finished block is news, not a reason to cover
+    /// whatever you were looking at. The Timer tab is put up underneath, so
+    /// hovering lands where the next one starts.
+    ///
+    /// With the panel in use the tab is left alone — switching it under the
+    /// cursor is worse than the panel opening by itself was — and the alert
+    /// waits for the panel to close, unless the timer has been started or
+    /// reset by then, which says it was seen.
+    func timerFinished(_ finish: PomodoroTimer.Finish) {
+        let next = finish.mode == .focus ? pomodoro.breakMinutes : pomodoro.focusMinutes
+        let alert = NotchActivity.timer(finished: finish.mode, nextMinutes: next)
+        guard isExpanded else {
+            tab = .timer
+            present(alert)
+            return
+        }
+        held = (alert, { [weak self] in
+            guard let self else { return false }
+            return !self.pomodoro.isRunning && self.pomodoro.finished == finish
+        })
+    }
+
+    private func presentHeld() {
+        guard let held else { return }
+        self.held = nil
+        if held.stillWanted() { present(held.activity) }
     }
 
     /// Clears an expired alert; the controller calls this every frame.

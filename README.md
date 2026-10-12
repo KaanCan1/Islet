@@ -35,8 +35,10 @@ one you move or delete simply drops off.
 calibrated upright, and how much of today has been spent that way. If it stays
 down for a few minutes, the notch says so once and then leaves you alone.
 
-**Timer** — a pomodoro with Focus and Break modes. Plus battery alerts when the
-charger goes in or out, and an option to stay visible on the lock screen.
+**Timer** — a pomodoro with Focus and Break modes. When one runs out the notch
+says so and what comes next, without throwing the panel open over your work.
+Plus battery alerts when the charger goes in or out, and an option to stay
+visible on the lock screen.
 
 While something is playing, a small summary sits beside the notch:
 
