@@ -1,6 +1,6 @@
 APP := dist/Islet.app
 
-.PHONY: build run install uninstall clean
+.PHONY: build run install uninstall clean test
 
 build:
 	@./scripts/build_app.sh
@@ -20,6 +20,9 @@ install: build
 uninstall:
 	@pkill -x Islet || true
 	@rm -rf /Applications/Islet.app
+
+test:
+	@swift test
 
 clean:
 	@rm -rf .build dist
