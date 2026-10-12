@@ -74,6 +74,9 @@ enum ClaudeUsageAPI {
     ]
 
     static func fetch() async -> Result<Reading, Failure> {
+        if let lastRefused, Date().timeIntervalSince(lastRefused) < refusedCooldown {
+            return .failure(.unauthorized)
+        }
         let token: String
         switch tokenState() {
         case .valid(let value):
@@ -100,7 +103,14 @@ enum ClaudeUsageAPI {
 
         switch http.statusCode {
         case 200: break
-        case 401, 403: return .failure(.unauthorized)
+        case 401, 403:
+            // The held token is no good after all — revoked, or the account
+            // changed under it. Back to the keychain for another, but not on
+            // the next poll: if what is stored is the token just refused,
+            // reading it every three minutes brings the prompt straight back.
+            cached = nil
+            lastRefused = Date()
+            return .failure(.unauthorized)
         case 429: return .failure(.rateLimited)
         default: return .failure(.transport)
         }
@@ -394,6 +404,13 @@ enum ClaudeUsageAPI {
         return object.keys.sorted().joined(separator: ", ")
     }
 
+    /// When a stored token runs out. One with no timestamp is held for an hour
+    /// rather than for ever: it is treated as valid, but not trusted that far.
+    private static func expiry(of oauth: [String: Any]) -> Date {
+        guard let value = oauth["expiresAt"] as? Double else { return Date().addingTimeInterval(3600) }
+        return Date(timeIntervalSince1970: value > 1_000_000_000_000 ? value / 1000 : value)
+    }
+
     /// Timestamps are milliseconds in this document; tolerate seconds anyway.
     /// A missing timestamp is treated as still valid — the endpoint is the real
     /// authority, and guessing "expired" would renew a perfectly good token.
@@ -409,10 +426,20 @@ enum ClaudeUsageAPI {
         case valid(String)
     }
 
-    /// The last token this process minted, so a keychain write that did not take
-    /// cannot turn into a renewal per poll. Process-local and never written down.
+    /// The token in use, read from the keychain or minted here, held until it
+    /// expires. Process-local and never written down.
+    ///
+    /// Holding it is what keeps the password prompt away. Reading the item is
+    /// what asks, and for a build that is not on the item's partition list —
+    /// every self-signed build, until the password is typed for it — macOS asks
+    /// on every single read. Reading it on each poll made that a login-password
+    /// dialog every three minutes; now it is one when Islet starts and one
+    /// when the token runs out. It also keeps a keychain write that did not take
+    /// from turning into a renewal per poll.
     nonisolated(unsafe) private static var cached: (value: String, expires: Date)?
     nonisolated(unsafe) private static var lastRenewFailure: Date?
+    nonisolated(unsafe) private static var lastRefused: Date?
+    private static let refusedCooldown: TimeInterval = 900
     private static let renewCooldown: TimeInterval = 300
     /// Why the last renewal did not go through, for `--diagnose`. Status and the
     /// server's error type only — never any part of the request.
@@ -423,6 +450,9 @@ enum ClaudeUsageAPI {
     /// because the fix for each is different: the second one this can repair
     /// itself, and carries out the item it has to write back to.
     private static func tokenState() -> TokenState {
+        // A minute's margin, so a token is not sent off to expire in flight.
+        if let cached, cached.expires > Date().addingTimeInterval(60) { return .valid(cached.value) }
+
         var stale: (service: String, blob: [String: Any])?
         for service in credentialServices() {
             guard let blob = credentialBlob(service: service),
@@ -435,12 +465,10 @@ enum ClaudeUsageAPI {
                 if stale == nil { stale = (service, blob) }
                 continue
             }
+            cached = (token, expiry(of: oauth))
             return .valid(token)
         }
         guard let stale else { return .missing }
-        // Only consulted once what is stored has aged out, so a token Claude Code
-        // renewed in the meantime still wins over ours.
-        if let cached, cached.expires > Date() { return .valid(cached.value) }
         return .expired(service: stale.service, blob: stale.blob)
     }
 }

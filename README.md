@@ -84,6 +84,13 @@ carry a grant across updates. `Islet --keychain-trust` says which side of it the
 running build is on, and reads nothing but the access list, so it never sets off
 the prompt it explains.
 
+Until the pin matches, macOS asks on every read of the item, not once. So Islet
+reads the token once and holds it in memory — never on disk — until it expires:
+the prompt comes when Islet starts and when the token runs out, every few hours,
+rather than with every refresh. If Claude turns a held token away, Islet waits a
+quarter of an hour before looking in the keychain again, in case the stored one
+is the same.
+
 Islet also asks once, itself, before reading anything under `~/.claude` — macOS
 does not gate that directory, so nothing would otherwise stop an app reading it
 quietly. Answer "Not now" and none of it is touched.
