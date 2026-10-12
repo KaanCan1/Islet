@@ -186,7 +186,7 @@ final class ClaudeUsageMonitor: ObservableObject {
 
     private func summarise(with api: ClaudeUsageAPI.Reading?) async -> Snapshot? {
         await withCheckedContinuation { continuation in
-            queue.async { continuation.resume(returning: Store.shared.refreshAndSummarise(api: api)) }
+            queue.async { continuation.resume(returning: ClaudeUsageStore.shared.refreshAndSummarise(api: api)) }
         }
     }
 
@@ -215,7 +215,7 @@ final class ClaudeUsageMonitor: ObservableObject {
             semaphore.signal()
         }
         _ = semaphore.wait(timeout: .now() + 20)
-        return Store.shared.refreshAndSummarise(api: reading)
+        return ClaudeUsageStore.shared.refreshAndSummarise(api: reading)
     }
 }
 
@@ -243,21 +243,35 @@ private struct Cache: Codable {
 }
 
 /// Owns the cache file and the incremental scan. Lives off the main actor.
-private final class Store: @unchecked Sendable {
-    static let shared = Store()
+///
+/// Where it reads and writes, and what time it is, can be handed in, which is
+/// how the tests run it over transcripts they wrote themselves.
+final class ClaudeUsageStore: @unchecked Sendable {
+    static let shared = ClaudeUsageStore()
 
     private let lock = NSLock()
     private var cache = Cache()
     private var loaded = false
 
-    private lazy var cacheURL: URL = {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Islet", isDirectory: true)
-        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
-        return base.appendingPathComponent("claude-usage.json")
-    }()
+    private let root: URL
+    private let cacheURL: URL
 
-    func refreshAndSummarise(api: ClaudeUsageAPI.Reading? = nil) -> ClaudeUsageMonitor.Snapshot? {
+    init(
+        root: URL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".claude/projects", isDirectory: true),
+        cacheURL: URL? = nil
+    ) {
+        self.root = root
+        self.cacheURL = cacheURL ?? {
+            let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("Islet", isDirectory: true)
+            try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+            return base.appendingPathComponent("claude-usage.json")
+        }()
+    }
+
+    func refreshAndSummarise(api: ClaudeUsageAPI.Reading? = nil,
+                             now: Date = Date()) -> ClaudeUsageMonitor.Snapshot? {
         lock.lock()
         defer { lock.unlock() }
 
@@ -270,22 +284,20 @@ private final class Store: @unchecked Sendable {
             }
         }
 
-        scan()
-        prune()
+        scan(now: now)
+        prune(now: now)
         save()
-        return summarise(api: api)
+        return summarise(api: api, now: now)
     }
 
     // MARK: Scan
 
-    private func scan() {
-        let root = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".claude/projects", isDirectory: true)
+    private func scan(now: Date) {
         guard let projects = try? FileManager.default.contentsOfDirectory(
             at: root, includingPropertiesForKeys: [.contentModificationDateKey]
         ) else { return }
 
-        let horizon = Date().addingTimeInterval(-scanHorizon)
+        let horizon = now.addingTimeInterval(-scanHorizon)
         for project in projects {
             guard let files = try? FileManager.default.contentsOfDirectory(
                 at: project, includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey]
@@ -435,8 +447,8 @@ private final class Store: @unchecked Sendable {
 
     // MARK: Housekeeping
 
-    private func prune() {
-        let cutoff = Date().addingTimeInterval(-scanHorizon).timeIntervalSince1970
+    private func prune(now: Date) {
+        let cutoff = now.addingTimeInterval(-scanHorizon).timeIntervalSince1970
         var times: [Double] = [], tokens: [Int] = [], costs: [Double] = []
         for index in cache.times.indices where cache.times[index] >= cutoff {
             times.append(cache.times[index])
@@ -456,9 +468,9 @@ private final class Store: @unchecked Sendable {
 
     // MARK: Summary
 
-    private func summarise(api: ClaudeUsageAPI.Reading?) -> ClaudeUsageMonitor.Snapshot? {
+    private func summarise(api: ClaudeUsageAPI.Reading?, now date: Date) -> ClaudeUsageMonitor.Snapshot? {
         guard !cache.times.isEmpty else { return nil }
-        let now = Date().timeIntervalSince1970
+        let now = date.timeIntervalSince1970
 
         // The window opens with the first request after the previous one ran out,
         // so this needs exact timestamps rather than anything rounded.
@@ -473,20 +485,21 @@ private final class Store: @unchecked Sendable {
         // three of the five exact.
         let aligned = (blockStart / 600).rounded(.down) * 600
         let five = window(from: aligned, to: now, length: fiveHourWindow,
-                          resetsAt: recordedReset(for: "five_hour")
+                          resetsAt: recordedReset(for: "five_hour", now: date)
                               ?? Date(timeIntervalSince1970: aligned + fiveHourWindow),
-                          type: "five_hour", exact: api?.fiveHour)
+                          type: "five_hour", exact: api?.fiveHour, now: date)
         let seven = window(from: now - sevenDayWindow, to: now, length: sevenDayWindow,
-                           resetsAt: projectedWeeklyReset(now: Date()),
-                           type: "seven_day", exact: api?.sevenDay)
-        return ClaudeUsageMonitor.Snapshot(fiveHour: five, sevenDay: seven, updatedAt: Date())
+                           resetsAt: projectedWeeklyReset(now: date),
+                           type: "seven_day", exact: api?.sevenDay, now: date)
+        return ClaudeUsageMonitor.Snapshot(fiveHour: five, sevenDay: seven, updatedAt: date)
     }
 
     private func window(from start: TimeInterval, to end: TimeInterval, length: TimeInterval,
-                        resetsAt: Date?, type: String, exact: ClaudeUsageAPI.Window?) -> ClaudeWindow {
+                        resetsAt: Date?, type: String, exact: ClaudeUsageAPI.Window?,
+                        now: Date) -> ClaudeWindow {
         let used = usageSeconds(from: start, to: end)
         let spent = tokens(from: start, to: end)
-        let rejected = isRejected(type, now: Date())
+        let rejected = isRejected(type, now: now)
         var ceiling = estimatedCeiling(for: type, window: length)
         // Running past the ceiling without being cut off proves it too low, so
         // raise it. That is what keeps this honest as limits move: a promo or a
@@ -568,9 +581,9 @@ private final class Store: @unchecked Sendable {
 
     /// A rejection carries the server's own reset time. While that time is still
     /// ahead of us it describes the window we are in, and beats anything inferred.
-    private func recordedReset(for type: String) -> Date? {
+    private func recordedReset(for type: String, now: Date) -> Date? {
         cache.rejections
-            .filter { $0.type == type && $0.resetsAt > Date() }
+            .filter { $0.type == type && $0.resetsAt > now }
             .map(\.resetsAt)
             .min()
     }

@@ -112,7 +112,7 @@ enum ClaudeUsageAPI {
                                 sevenDay: window(object["seven_day"])))
     }
 
-    private static func window(_ value: Any?) -> Window? {
+    static func window(_ value: Any?) -> Window? {
         guard let dictionary = value as? [String: Any],
               let utilization = dictionary["utilization"] as? Double
         else { return nil }
