@@ -102,7 +102,7 @@ final class MusicManager: ObservableObject {
 
         var fallback: (TrackInfo, Double?)?
         for app in candidates {
-            guard let raw = await AppleScriptRunner.shared.run(Self.nowPlayingScript(for: app)),
+            guard let raw = await AppleScriptRunner.shared.run(Self.nowPlayingScript(for: app), keep: true),
                   raw != "NA",
                   let parsed = parse(raw, source: app) else { continue }
             if parsed.0.isPlaying {
@@ -335,9 +335,9 @@ final class MusicManager: ObservableObject {
 }
 
 extension AppleScriptRunner {
-    func run(_ source: String) async -> String? {
+    func run(_ source: String, keep: Bool = false) async -> String? {
         await withCheckedContinuation { continuation in
-            run(source) { continuation.resume(returning: $0) }
+            run(source, keep: keep) { continuation.resume(returning: $0) }
         }
     }
 }
