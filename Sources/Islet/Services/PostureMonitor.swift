@@ -32,20 +32,6 @@ final class PostureMonitor: NSObject, ObservableObject {
 
     /// How far below upright counts as slouching.
     static let thresholdDegrees: Double = 18
-    /// How far back the nudge looks.
-    ///
-    /// Time past the threshold is counted across this window rather than
-    /// demanded in one unbroken run. At a desk the angle crosses the line
-    /// constantly and rarely stays over it — lifting your head for a moment
-    /// used to reset the whole count, which is why the feature tracked
-    /// correctly for hours and never once spoke.
-    static let windowSeconds: TimeInterval = 180
-    /// How much of that window spent down earns a nudge. Long enough that
-    /// reading something on the desk is not a slouch, short enough to see it
-    /// happen if you deliberately hold your head down.
-    static let budgetSeconds: TimeInterval = 90
-    /// Quiet period after an alert, so it nags at most a few times an hour.
-    static let cooldownSeconds: TimeInterval = 600
 
     @Published private(set) var availability: Availability = .unavailable
     /// False until a reference angle exists. Nothing is judged before then.
@@ -61,20 +47,10 @@ final class PostureMonitor: NSObject, ObservableObject {
     /// the quiet period, or it is lost and the next is ten minutes away.
     var onSlouch: ((Int) -> Bool)?
 
-    /// One processed reading: how long it covered, and whether it was past the
-    /// threshold. Readings are throttled to a couple a second, so a full window
-    /// is a few hundred of these.
-    private struct Sample {
-        let at: Date
-        let seconds: TimeInterval
-        let isDown: Bool
-    }
-
     private let manager = CMHeadphoneMotionManager()
     private let prefs = Preferences.shared
 
-    private var recent: [Sample] = []
-    private var lastAlert: Date?
+    private var budget = SlouchBudget()
     private var lastSample: Date?
     private var statsDay: Date = Calendar.current.startOfDay(for: Date())
     private var lastPersist: Date?
@@ -197,7 +173,7 @@ final class PostureMonitor: NSObject, ObservableObject {
         availability = .unavailable
         drop = nil
         isSlouching = false
-        recent.removeAll()
+        budget.forgetReadings()
         lastSample = nil
         lastProcessed = nil
         calibrationSamples = []
@@ -218,7 +194,7 @@ final class PostureMonitor: NSObject, ObservableObject {
         calibrationSamples = []
         drop = 0
         isSlouching = false
-        recent.removeAll()
+        budget.forgetReadings()
     }
 
     // MARK: - Sampling
@@ -269,27 +245,16 @@ final class PostureMonitor: NSObject, ObservableObject {
             isSlouching = false
         }
 
-        recent.append(Sample(at: now, seconds: elapsed, isDown: isDown))
-        let cutoff = now.addingTimeInterval(-Self.windowSeconds)
-        recent.removeAll { $0.at < cutoff }
-
-        let down = recent.reduce(0) { $0 + ($1.isDown ? $1.seconds : 0) }
-        guard down >= Self.budgetSeconds else { return }
-        if let last = lastAlert, now.timeIntervalSince(last) < Self.cooldownSeconds { return }
-
-        guard onSlouch?(max(1, Int(down / 60))) == true else { return }
-
-        lastAlert = now
-        // Spent: the next nudge has to be earned from scratch rather than
-        // arriving the moment the quiet period lapses.
-        recent.removeAll()
+        guard let down = budget.record(isDown: isDown, seconds: elapsed, at: now),
+              onSlouch?(max(1, Int(down / 60))) == true
+        else { return }
+        budget.spend(at: now)
     }
 
     /// How close the current window is to earning a nudge, for the panel.
     var budgetFraction: Double {
         guard isCalibrated else { return 0 }
-        let down = recent.reduce(0) { $0 + ($1.isDown ? $1.seconds : 0) }
-        return min(1, down / Self.budgetSeconds)
+        return budget.fraction
     }
 
     private func rolloverIfNeeded(_ now: Date) {
@@ -331,9 +296,78 @@ extension PostureMonitor: CMHeadphoneMotionManagerDelegate {
             self.availability = .unavailable
             self.drop = nil
             self.isSlouching = false
-            self.recent.removeAll()
+            self.budget.forgetReadings()
             self.lastSample = nil
             self.calibrationSamples = []
         }
+    }
+}
+
+/// When time spent with the head down has earned a nudge.
+///
+/// Kept apart from the monitor so the rule can be run against a clock rather
+/// than a pair of AirPods: everything it needs is a reading's length, whether
+/// it was past the threshold, and when it arrived.
+struct SlouchBudget {
+    /// How far back the nudge looks.
+    ///
+    /// Time past the threshold is counted across this window rather than
+    /// demanded in one unbroken run. At a desk the angle crosses the line
+    /// constantly and rarely stays over it — lifting your head for a moment
+    /// used to reset the whole count, which is why the feature tracked
+    /// correctly for hours and never once spoke.
+    static let windowSeconds: TimeInterval = 180
+    /// How much of that window spent down earns a nudge. Long enough that
+    /// reading something on the desk is not a slouch, short enough to see it
+    /// happen if you deliberately hold your head down.
+    static let budgetSeconds: TimeInterval = 90
+    /// Quiet period after an alert, so it nags at most a few times an hour.
+    static let cooldownSeconds: TimeInterval = 600
+
+    /// One processed reading: how long it covered, and whether it was past the
+    /// threshold. Readings are throttled to a couple a second, so a full window
+    /// is a few hundred of these.
+    private struct Sample {
+        let at: Date
+        let seconds: TimeInterval
+        let isDown: Bool
+    }
+
+    private var recent: [Sample] = []
+    private var lastNudge: Date?
+
+    /// Seconds spent down within the window.
+    var downSeconds: TimeInterval {
+        recent.reduce(0) { $0 + ($1.isDown ? $1.seconds : 0) }
+    }
+
+    /// How close the window is to earning a nudge.
+    var fraction: Double { min(1, downSeconds / Self.budgetSeconds) }
+
+    /// Adds a reading. Returns the time spent down when that has earned a nudge,
+    /// and keeps returning it until `spend` says the nudge was actually shown.
+    mutating func record(isDown: Bool, seconds: TimeInterval, at now: Date) -> TimeInterval? {
+        recent.append(Sample(at: now, seconds: seconds, isDown: isDown))
+        let cutoff = now.addingTimeInterval(-Self.windowSeconds)
+        recent.removeAll { $0.at < cutoff }
+
+        let down = downSeconds
+        guard down >= Self.budgetSeconds else { return nil }
+        if let last = lastNudge, now.timeIntervalSince(last) < Self.cooldownSeconds { return nil }
+        return down
+    }
+
+    /// The nudge reached the screen. Only now does the quiet period start, and
+    /// the next one has to be earned from scratch rather than arriving the
+    /// moment the quiet period lapses.
+    mutating func spend(at now: Date) {
+        lastNudge = now
+        recent.removeAll()
+    }
+
+    /// Drops the readings but not the quiet period: recalibrating or taking
+    /// the AirPods out is no reason to nudge again sooner.
+    mutating func forgetReadings() {
+        recent.removeAll()
     }
 }

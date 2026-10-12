@@ -103,10 +103,10 @@ enum PostureProbe {
             + "(\(Preferences.shared.postureCalibrated ? "stored" : "not stored"))")
         say("alerts pref   : \(Preferences.shared.postureAlerts ? "on" : "OFF - nothing will ever fire")")
         say("visible tabs  : \(tabs)")
-        say("nudge rule    : \(Int(PostureMonitor.budgetSeconds))s past "
+        say("nudge rule    : \(Int(SlouchBudget.budgetSeconds))s past "
             + "\(Int(PostureMonitor.thresholdDegrees))° within any "
-            + "\(Int(PostureMonitor.windowSeconds / 60)) min, then "
-            + "\(Int(PostureMonitor.cooldownSeconds / 60)) min quiet")
+            + "\(Int(SlouchBudget.windowSeconds / 60)) min, then "
+            + "\(Int(SlouchBudget.cooldownSeconds / 60)) min quiet")
 
         if lastDrop == nil {
             say("")
