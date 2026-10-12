@@ -1,3 +1,4 @@
+import AppKit
 import CoreMotion
 import Foundation
 
@@ -57,8 +58,23 @@ final class PostureMonitor: NSObject, ObservableObject {
     /// AirPods come and go. While the feature is on but nothing is connected,
     /// this keeps looking rather than making you toggle the menu item again.
     private var retry: Timer?
-    /// Samples arrive at about 25 Hz; nothing here needs more than a couple a second.
-    private var lastProcessed: Date?
+    /// Thins the stream before it reaches the main thread. Samples arrive at
+    /// about 25 Hz and nothing here needs more than a couple a second, so the
+    /// rest are dropped where they land instead of each waking the app.
+    private let thinning = Thinning()
+    private let motionQueue: OperationQueue = {
+        let queue = OperationQueue()
+        queue.name = "dev.islet.head-motion"
+        queue.maxConcurrentOperationCount = 1
+        queue.qualityOfService = .utility
+        return queue
+    }()
+    /// Why the stream is off although the feature is on. Sending head motion
+    /// costs AirPods battery, and with the screen locked or asleep there is
+    /// nobody at it to nudge, so it is stopped until there is.
+    private var pausedFor: Set<Pause> = []
+    private enum Pause { case locked, asleep }
+    private var observers: [(NotificationCenter, NSObjectProtocol)] = []
     /// First readings after starting, used to settle on an upright angle without
     /// making anyone press a button to get a working feature.
     private var calibrationSamples: [Double] = []
@@ -69,6 +85,43 @@ final class PostureMonitor: NSObject, ObservableObject {
         manager.delegate = self
         isCalibrated = prefs.postureCalibrated
         restoreTotals()
+        watchTheScreen()
+    }
+
+    /// Locking and display sleep come from different places: the lock is a
+    /// distributed notification, the display from the workspace. Both are
+    /// watched always — they cost nothing — and only matter while enabled.
+    private func watchTheScreen() {
+        let distributed = DistributedNotificationCenter.default()
+        let workspace = NSWorkspace.shared.notificationCenter
+        let watches: [(NotificationCenter, Notification.Name, Pause, Bool)] = [
+            (distributed, Notification.Name("com.apple.screenIsLocked"), .locked, true),
+            (distributed, Notification.Name("com.apple.screenIsUnlocked"), .locked, false),
+            (workspace, NSWorkspace.screensDidSleepNotification, .asleep, true),
+            (workspace, NSWorkspace.screensDidWakeNotification, .asleep, false)
+        ]
+        for (center, name, reason, starts) in watches {
+            let token = center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.pause(reason, starts) }
+            }
+            observers.append((center, token))
+        }
+    }
+
+    private func pause(_ reason: Pause, _ starts: Bool) {
+        let wasPaused = !pausedFor.isEmpty
+        if starts { pausedFor.insert(reason) } else { pausedFor.remove(reason) }
+        guard retry != nil, wasPaused != !pausedFor.isEmpty else { return }
+
+        if pausedFor.isEmpty {
+            attach()
+        } else {
+            manager.stopDeviceMotionUpdates()
+            // The gap is not time worn: the next sample starts the clock again.
+            lastSample = nil
+            drop = nil
+            if availability == .tracking { availability = .waiting }
+        }
     }
 
     /// The panel says "today", so the totals have to mean the day rather than
@@ -137,6 +190,8 @@ final class PostureMonitor: NSObject, ObservableObject {
         // Already streaming: leave it be. What the panel says about it is
         // decided by whether samples arrive, so a reconnect recovers on its own.
         guard !manager.isDeviceMotionActive else { return }
+        // Paused for the screen: the retry timer must not undo that.
+        guard pausedFor.isEmpty else { return }
 
         switch CMHeadphoneMotionManager.authorizationStatus() {
         case .denied, .restricted:
@@ -154,17 +209,18 @@ final class PostureMonitor: NSObject, ObservableObject {
         // Optimism ends here: .tracking is earned by an actual sample, in
         // consume(), not by the call that opens the stream succeeding.
         availability = .waiting
-        manager.startDeviceMotionUpdates(to: .main) { [weak self] motion, error in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                if error != nil {
-                    self.availability = CMHeadphoneMotionManager.authorizationStatus() == .denied
-                        ? .denied : .unavailable
-                    return
-                }
-                guard let motion else { return }
-                self.consume(motion)
+        thinning.reset()
+        let thinning = self.thinning
+        manager.startDeviceMotionUpdates(to: motionQueue) { [weak self] motion, error in
+            if error != nil {
+                let denied = CMHeadphoneMotionManager.authorizationStatus() == .denied
+                Task { @MainActor in self?.availability = denied ? .denied : .unavailable }
+                return
             }
+            // Only the pitch crosses over, and only a couple of times a second.
+            guard let motion, thinning.admits(at: motion.timestamp) else { return }
+            let pitch = motion.attitude.pitch
+            Task { @MainActor in self?.consume(pitch: pitch) }
         }
     }
 
@@ -175,7 +231,6 @@ final class PostureMonitor: NSObject, ObservableObject {
         isSlouching = false
         budget.forgetReadings()
         lastSample = nil
-        lastProcessed = nil
         calibrationSamples = []
     }
 
@@ -199,10 +254,8 @@ final class PostureMonitor: NSObject, ObservableObject {
 
     // MARK: - Sampling
 
-    private func consume(_ motion: CMDeviceMotion) {
+    private func consume(pitch: Double) {
         let now = Date()
-        if let last = lastProcessed, now.timeIntervalSince(last) < 0.4 { return }
-        lastProcessed = now
 
         if availability != .tracking { availability = .tracking }
         rolloverIfNeeded(now)
@@ -211,14 +264,14 @@ final class PostureMonitor: NSObject, ObservableObject {
         // them, so the feature works on its own. Whatever you are doing then
         // becomes "upright", which is why the panel keeps offering to redo it.
         guard isCalibrated else {
-            calibrationSamples.append(motion.attitude.pitch)
+            calibrationSamples.append(pitch)
             guard calibrationSamples.count >= Self.calibrationCount else { return }
             setUpright(calibrationSamples.sorted()[calibrationSamples.count / 2])
             return
         }
 
         // Positive = tipped forward of the calibrated upright angle.
-        let degrees = (prefs.uprightPitch - motion.attitude.pitch) * 180 / .pi
+        let degrees = (prefs.uprightPitch - pitch) * 180 / .pi
         drop = degrees
 
         // Time only accrues between nearby samples. A gap means the AirPods were
@@ -286,13 +339,15 @@ final class PostureMonitor: NSObject, ObservableObject {
     }
 }
 
+/// CoreMotion calls these on the queue the updates go to, which is the motion
+/// queue rather than the main thread, so each hops over instead of assuming.
 extension PostureMonitor: CMHeadphoneMotionManagerDelegate {
     nonisolated func headphoneMotionManagerDidConnect(_ manager: CMHeadphoneMotionManager) {
-        MainActor.assumeIsolated { self.availability = .tracking }
+        Task { @MainActor in self.availability = .tracking }
     }
 
     nonisolated func headphoneMotionManagerDidDisconnect(_ manager: CMHeadphoneMotionManager) {
-        MainActor.assumeIsolated {
+        Task { @MainActor in
             self.availability = .unavailable
             self.drop = nil
             self.isSlouching = false
@@ -370,4 +425,19 @@ struct SlouchBudget {
     mutating func forgetReadings() {
         recent.removeAll()
     }
+}
+
+/// Lets one head-motion sample through every 0.4 seconds of sensor time.
+/// Touched only from the monitor's own serial queue, apart from `reset`, which
+/// runs while no stream is open.
+private final class Thinning: @unchecked Sendable {
+    private var last: TimeInterval?
+
+    func admits(at timestamp: TimeInterval) -> Bool {
+        if let last, timestamp - last < 0.4, timestamp >= last { return false }
+        last = timestamp
+        return true
+    }
+
+    func reset() { last = nil }
 }

@@ -109,10 +109,12 @@ quietly. Answer "Not now" and none of it is touched.
   were doing then counts as upright — press "Set upright" to fix it properly.
 - Posture needs AirPods Pro, AirPods (3rd generation) or AirPods Max, and it only
   streams head motion while the feature is switched on — it costs AirPods battery,
-  which is why it is off by default. The angle has to hold past the threshold for
-  ninety seconds within any three-minute stretch before anything is said, and
-  there is ten minutes of quiet afterwards. A nudge that arrives while the panel
-  is open is not spent: it waits rather than starting the quiet period on an
+  which is why it is off by default, and why the stream stops while the screen is
+  locked or asleep and picks up again when you are back. The angle has to hold
+  past the threshold for ninety seconds within any three-minute stretch before
+  anything is said, and there is ten minutes of quiet afterwards. A nudge that
+  arrives while the panel is open is not spent: it waits rather than starting the
+  quiet period on an
   alert nobody saw. Counting across a window rather than
   demanding one unbroken run is the point: at a desk the angle crosses the line
   constantly and rarely stays over it, so a rule that resets every time you lift
