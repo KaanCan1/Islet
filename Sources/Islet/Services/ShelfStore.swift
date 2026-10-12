@@ -31,8 +31,10 @@ final class ShelfStore: ObservableObject {
     var isEmpty: Bool { items.isEmpty }
 
     private static let storageKey = "shelfItems"
+    private let defaults: UserDefaults
 
-    init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         restore()
     }
 
@@ -40,7 +42,7 @@ final class ShelfStore: ObservableObject {
     /// after a restart. Only the paths are kept — the files themselves were
     /// never Islet's — and anything that has since moved is dropped.
     private func restore() {
-        let paths = UserDefaults.standard.stringArray(forKey: Self.storageKey) ?? []
+        let paths = defaults.stringArray(forKey: Self.storageKey) ?? []
         let manager = FileManager.default
         for path in paths.prefix(Self.capacity) where manager.fileExists(atPath: path) {
             let url = URL(fileURLWithPath: path)
@@ -54,7 +56,7 @@ final class ShelfStore: ObservableObject {
     }
 
     private func save() {
-        UserDefaults.standard.set(items.map(\.url.path), forKey: Self.storageKey)
+        defaults.set(items.map(\.url.path), forKey: Self.storageKey)
     }
 
     // MARK: - Mutation

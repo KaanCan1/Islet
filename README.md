@@ -167,6 +167,19 @@ quietly. Answer "Not now" and none of it is touched.
   angle, whether it has a reference yet, and which tabs the panel is showing.
   It is the only way to see that, for the reason above.
 
+## Tests
+
+```bash
+make test
+```
+
+They cover the rules that have been wrong before and are hard to see from the
+outside: how the Claude scanner reads tokens and learns the ceiling (run over
+transcripts the tests write themselves, against a clock they set), when a
+Claude alert is said and when it stays quiet, the posture budget and its quiet
+period, and the shelf surviving a restart. Nothing in them touches your real
+`~/.claude`, keychain, shelf or settings.
+
 ## Reproducing the screenshots and the demo
 
 Everything under `docs/` is generated, and the scripts that generate it are in
